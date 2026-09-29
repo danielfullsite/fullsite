@@ -4,28 +4,54 @@ name: Eval IA del dueño
 # Groq real + Supabase de STAGING (tenant chickin-demo por defecto). No escribe nada en la
 # base: las bitácoras del chat se interceptan y las consultas son de sólo lectura.
 #
-# SÓLO manual (workflow_dispatch). No corre en pull_request a propósito: un PR podría
-# cambiar el código que se ejecuta con la service key de staging.
+# Manual (workflow_dispatch) y NOCTURNA (schedule, 08:17 UTC ≈ 02:17 Monterrey). No corre
+# en pull_request a propósito: un PR podría cambiar el código que se ejecuta con la service
+# key de staging. `schedule` sólo corre desde la rama por defecto.
 #
-# Environment `eval-staging` (Settings → Environments), con revisores requeridos: cada
-# corrida espera aprobación antes de recibir los secrets. Secrets DEL ENVIRONMENT:
+# Environments (Settings → Environments) — el job elige uno según el evento:
+#   · manual   → `eval-staging`: con revisores requeridos (cada corrida espera aprobación
+#                antes de recibir los secrets).
+#   · nocturna → `eval-staging-nightly`: SIN revisores (un schedule con revisores se queda
+#                esperando aprobación cada noche) pero con "Deployment branches and tags" =
+#                Selected → sólo `main`. Así sólo el código ya fusionado recibe los secrets.
+#                Si prefieres aprobar cada noche, pon revisores en ese environment.
+# Ambos environments necesitan estos secrets (DEL ENVIRONMENT):
 #   SUPABASE_URL_STAGING           — URL del proyecto de staging
 #   SUPABASE_SERVICE_KEY_STAGING   — service_role de staging
 #   GROQ_API_KEY                   — (o el del repo, que ya existe)
 # (Los SUPABASE_URL / SUPABASE_SERVICE_KEY del repo son de producción: no se usan aquí.)
 #
+# Preguntas: banco escrito a mano (57) + muestra estratificada de preguntas GENERADAS sobre
+# los datos del tenant (evals/ia/generador.ts; `muestra`, `semilla`). Semilla por defecto =
+# fecha → otra muestra cada noche, repetible pasando la misma semilla. Si Groq agota la
+# cuota diaria, la eval se detiene y reporta lo que alcanzó (infraestructura, no falla).
+#
 # Falla si la exactitud < umbral (0.9), si una trampa falla (dato inventado) o si >10% de
-# las preguntas no tuvo respuesta del chat. El reporte (artifact, 7 días) no trae datos del
+# las preguntas no tuvo respuesta del chat. El reporte (artifact, 7 días; nocturna 30) no trae datos del
 # restaurante: sólo aprobado/fallido, números esperado vs obtenido, latencia, consultas y
 # clase de error.
 
 on:
+  schedule:
+    - cron: '17 8 * * *'
   workflow_dispatch:
     inputs:
       solo:
-        description: 'Sólo estas preguntas (prefijos de id o categorías: simple,cruce,trampa,fechas), separadas por coma'
+        description: 'Sólo estas preguntas (prefijos de id/plantilla o categorías: simple,ranking,comparacion,cruce,trampa,fechas), separadas por coma'
         required: false
         default: ''
+      muestra:
+        description: 'Preguntas generadas a muestrear (0 = sólo el banco escrito a mano)'
+        required: false
+        default: '150'
+      semilla:
+        description: 'Semilla del muestreo (vacío = fecha de hoy YYYYMMDD)'
+        required: false
+        default: ''
+      incluir_base:
+        description: 'Incluir las 57 preguntas escritas a mano (1/0)'
+        required: false
+        default: '1'
       umbral:
         description: 'Exactitud mínima (0..1)'
         required: false
@@ -37,7 +63,8 @@ on:
 
 concurrency:
   group: eval-ia-${{ github.ref }}
-  cancel-in-progress: true
+  # Una a la vez (comparten la cuota de Groq). La nocturna no cancela una manual en curso: espera.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 permissions:
   contents: read
@@ -49,9 +76,12 @@ defaults:
 jobs:
   eval:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
-    # Aprobación requerida antes de exponer la service key de staging.
-    environment: eval-staging
+    # 150 generadas + 57 del banco a ~15–25 s c/u (pausas y límites de Groq). EVAL_IA_MAX_MIN
+    # detiene la corrida antes con reporte parcial.
+    timeout-minutes: 180
+    # Manual: aprobación requerida antes de exponer la service key de staging.
+    # Nocturna: environment sin revisores restringido a main (ver arriba).
+    environment: ${{ github.event_name == 'schedule' && 'eval-staging-nightly' || 'eval-staging' }}
     env:
       EVAL_IA_SUPABASE_URL: ${{ secrets.SUPABASE_URL_STAGING }}
       EVAL_IA_SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY_STAGING }}
@@ -59,6 +89,10 @@ jobs:
       EVAL_IA_TENANT: ${{ inputs.tenant || 'chickin-demo' }}
       EVAL_IA_UMBRAL: ${{ inputs.umbral || '0.9' }}
       EVAL_IA_SOLO: ${{ inputs.solo || '' }}
+      EVAL_IA_MUESTRA: ${{ inputs.muestra || '150' }}
+      EVAL_IA_SEMILLA: ${{ inputs.semilla || '' }}
+      EVAL_IA_INCLUIR_BASE: ${{ inputs.incluir_base || '1' }}
+      EVAL_IA_MAX_MIN: '160'
     steps:
       - uses: actions/checkout@v6
 
@@ -99,4 +133,5 @@ jobs:
             dashboard-app/evals/ia/resultados/*.md
             dashboard-app/evals/ia/resultados/*.json
           if-no-files-found: ignore
-          retention-days: 7
+          # Nocturna: 30 días para poder ver la tendencia (*.tendencia.json, sin datos).
+          retention-days: ${{ github.event_name == 'schedule' && 30 || 7 }}

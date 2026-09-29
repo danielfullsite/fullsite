@@ -28,6 +28,12 @@ const securityHeaders = [
     value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=(), payment=(self), usb=()',
   },
   {
+    // Voz natural del modo voz (Piper, IA-DEL-DUENO §5): el ÚNICO origen nuevo es
+    // Hugging Face en connect-src (el modelo es-MX, ~63 MB, se baja una vez y queda en
+    // OPFS; huggingface.co redirige a *.hf.co / *.huggingface.co). La librería,
+    // onnxruntime y el fonémico se sirven desde /voz/vendor ('self'), así que
+    // script-src no cambia; WebAssembly ya compila con 'unsafe-eval'; el worker es
+    // /voz/piper-worker.js ('self', cae en script-src porque no hay worker-src).
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
@@ -35,7 +41,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https://*.supabase.co https://*.vercel.com https://images.unsplash.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://vercel.live https://*.vercel.com https://*.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com wss://api.deepgram.com https://api.deepgram.com https://api.elevenlabs.io https://*.google.com https://*.googleapis.com wss://*.google.com http://127.0.0.1:7717 ws://127.0.0.1:7717 http://*:7717 ws://*:7717",
+      "connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://vercel.live https://*.vercel.com https://*.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com wss://api.deepgram.com https://api.deepgram.com https://api.elevenlabs.io https://*.google.com https://*.googleapis.com wss://*.google.com http://127.0.0.1:7717 ws://127.0.0.1:7717 http://*:7717 ws://*:7717",
       "media-src 'self' blob:",
       "frame-src 'self' https://vercel.live",
       "object-src 'none'",
@@ -108,6 +114,16 @@ const nextConfig: NextConfig = isCapacitorOffline
           {
             source: '/(.*)',
             headers: securityHeaders,
+          },
+          // Motor de la voz natural: rutas con versión (scripts/copiar-motor-voz.mjs),
+          // así que se pueden cachear para siempre. ~31 MB que no deben bajarse dos veces.
+          {
+            source: '/voz/vendor/:path*',
+            headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+          },
+          {
+            source: '/voz/:archivo(motor\\.json|piper-worker\\.js)',
+            headers: [{ key: 'Cache-Control', value: 'no-cache' }],
           },
         ];
       },

@@ -284,7 +284,8 @@ texto del modelo ──► extraer cifras ──► ¿cada una está en la EVIDE
 
 ### Eval de exactitud (`evals/ia`)
 
-- `preguntas.ts`: 57 preguntas en español — 16 simples, 23 cruces (mesero × franja × día,
+- `preguntas.ts`: banco fijo de 57 preguntas en español (además, el generador de abajo arma
+  miles sobre los datos del tenant) — 16 simples, 23 cruces (mesero × franja × día,
   platillo top desayuno vs cena, % de categoría por mesero, ticket fin de semana vs entre
   semana, hora pico por día, pareja de platillos más frecuente, bebida + acompañante, semana
   contra semana por categoría, sucursales, cancelaciones por mesero, % por método de pago…),
@@ -322,6 +323,88 @@ texto del modelo ──► extraer cifras ──► ¿cada una está en la EVIDE
   si existe `CI`) y no se comparte. **Exit 1** si la exactitud < `EVAL_IA_UMBRAL` (0.9), si **cualquier trampa falla**
   (= dato inventado) o si >10% de las preguntas no tuvo respuesta del chat (infraestructura).
 
+### Generador: miles de preguntas sin escribirlas (`evals/ia/generador.ts`)
+
+El banco de 57 es la regresión fija; para medir con volumen, el generador arma preguntas
+**sobre los datos reales del tenant**, con verdad en SQL, sin escribir ninguna a mano.
+
+```
+A. descubrimiento (rpc ia_consulta, mismo filtro por tenant)     B. plantillas (80)
+   meses con ventas (≤3) · meses SIN datos (ventana 24)             texto con huecos + verdad SQL
+   días del mes / semanas lun–dom (≥5 días con venta) / días sem.   + números/entidades (puntaje.ts)
+   meseros (≥20 órdenes, ≤12) · platillos top 15 · categorías ≤10          │
+   métodos de pago · sucursales (si >1) · franjas (sales_dayparts          ▼
+   por GET de sólo lectura; si no, DAYPARTS_DEFAULT)              expansión cartesiana → ~3,400
+                                                                  → muestra estratificada (semilla)
+                                                                  → runner (degenerada → reserva)
+```
+
+- **Plantillas (80):** 16 simples (ventas/órdenes/ticket por mes, día, semana, mesero,
+  platillo, categoría, método, franja, sucursal; varias con 2–3 redacciones), 19 rankings
+  (mesero/platillo/categoría/método top por mes, día de la semana y franja; hora pico por
+  día; día top; acompañante más frecuente de un platillo; pareja top; ticket por día),
+  9 comparaciones (mes vs mes, mesero vs mesero, semana vs semana total y por categoría,
+  fin de semana vs entre semana, franja vs franja, día vs mismo día de la semana anterior,
+  mesero y platillo mes vs mes), 19 cruces (mesero × franja × día de la semana, platillo ×
+  franja / día, % de categoría por mesero, % método por mesero, % de órdenes con bebida por
+  mesero, pareja específica, % de ingreso de un platillo, piezas por orden (y por mesero),
+  ticket y promedio diario por día de la semana, categoría × franja, día × franja…), 8 de
+  trampa (mes sin datos, mesero y platillo inexistentes, datos sensibles tipo × sujeto —
+  teléfono, correo, RFC, dirección, PIN, tarjeta, CURP—, competencia, publicidad, pronóstico
+  lejano, fecha futura) y 9 de fechas con reloj fijado (hace N días, ayer/anteayer, últimos N
+  días, el lunes… más reciente, semana pasada, mes pasado, mesero top de hace N días).
+- **Tamaño:** para un tenant típico (3 meses, 10 meseros, 15 platillos, 8 categorías, 4
+  métodos, 3 franjas) salen **~3,400** preguntas (simple ~430, ranking ~250, comparación
+  ~340, cruce ~2,250, trampa ~90, fechas ~45). Crece con los ejes: más meses o meseros lo
+  multiplican.
+- **Verdad:** todo el SQL usa `es_venta(status, payment_status)` y `dia_venta`, pasa por
+  `ia_consulta` (nunca escribe `client_id`) y respeta la lista blanca de `ia._validar_sql`:
+  `evals/ia/validar-sql.ts` es su espejo en TS y la prueba exige que **toda** plantilla
+  (y el banco, y el descubrimiento) la pase. Si cambias la lista en la migración, cámbiala
+  ahí. Las franjas usan minuto de jornada (lo anterior al inicio del día operativo es de la
+  noche previa), igual que `lib/dayparts`.
+- **Degeneradas:** no se sabe sin consultar si una combinación tiene datos. Al correr, una
+  generada cuya verdad viene vacía, en cero, sin entidad o con **empate** (los rankings traen
+  `limit 2`; 1º y 2º a ±0.5% = sin ganador claro) se **reemplaza** por otra de la misma
+  plantilla (o categoría) de la reserva del muestreo — cuesta una consulta, no una llamada a
+  Groq (máx. 5 por lugar). Una verdad que **falla** no se reemplaza: es plantilla rota y sale
+  en el reporte con su clase de error. Las trampas no se descartan por vacías (su
+  `validezSql` confirma que no hay datos; si hay, se reemplazan).
+- **Ids deterministas:** `<plantilla>~<hash de 12 hex de los parámetros>`: sin nombres, igual
+  entre corridas con los mismos datos. `EVAL_IA_SOLO` acepta categorías, prefijos de id o de
+  plantilla (`g-x-mesero-franja-dow`).
+- **Muestreo** (`EVAL_IA_MUESTRA`, 150; `EVAL_IA_SEMILLA`, fecha `YYYYMMDD`): estratificado por
+  categoría y reproducible por semilla (misma semilla + mismos datos = misma muestra; no
+  depende del orden). Trampas ≥ 1 de cada 10; cada categoría presente (si la muestra alcanza)
+  y el resto parejo; dentro de una categoría, ronda entre plantillas. Orden final
+  intercalado (trampas espaciadas, lo demás barajado, banco incluido) para que una corrida
+  cortada siga siendo representativa. `EVAL_IA_INCLUIR_BASE=1` (default) agrega las 57 del
+  banco; `EVAL_IA_MUESTRA=0` = sólo el banco, como antes.
+- **Ritmo y límites de Groq:** pausa `EVAL_IA_PAUSA_MS` (3 s) entre preguntas que llaman al
+  chat. `vigilarGroq` envuelve `fetch` y **ve** (no cambia) los 429 de `api.groq.com` dentro
+  del chat en proceso: si hubo 429, la respuesta no se califica (pudo salir por un camino
+  degradado); se espera `retry-after` (o el "try again in …" del cuerpo) + 1 s, o backoff
+  20/40/80 s, hasta `EVAL_IA_REINTENTOS` (3). **Cuota diaria** (RPD/TPD, o espera pedida >
+  `EVAL_IA_MAX_ESPERA_MS`) → la corrida **se detiene**: esa pregunta queda como
+  infraestructura, las restantes no cuentan, el reporte dice **CORRIDA PARCIAL** y la
+  compuerta no la toma como falla. `EVAL_IA_MAX_MIN` (150) es el presupuesto de tiempo (mismo
+  paro ordenado).
+- **Reporte:** además de lo anterior, exactitud con **IC 95% de Wilson** (global y por
+  categoría), tabla de **plantillas que más fallan** (el banco va junto como `banco`), y
+  `<fecha>.tendencia.json`: una línea compacta para series de tiempo (conteos, exactitudes,
+  IC, por categoría y por plantilla, corrida parcial) — **sin datos del restaurante**; los
+  dominios sólo se reportan como tamaños y los errores de descubrimiento como clase.
+
+**Escalar:** subir `EVAL_IA_MUESTRA` (hasta todo el pool) cuesta Groq, no SQL: cada pregunta
+son 1–6 llamadas. Con el tope gratuito (30/min y cuota diaria de peticiones y tokens) caben
+~150–250 por noche; más allá la corrida se corta sola con reporte parcial. Para miles:
+varias noches con semillas distintas (la tendencia las junta), una llave de pago en
+`GROQ_API_KEY` de staging, o `EVAL_IA_SOLO` para enfocar plantillas que fallan. Para
+ampliar el pool: `EVAL_IA_MESES_GEN` (meses como eje, 3), o `OPCIONES_DEFAULT` en
+`generador.ts` (meseros, platillos, categorías). Plantilla nueva = una entrada en
+`PLANTILLAS` (ejes, redacción, verdad, qué revisar, `empate` si es ranking); la prueba
+valida su SQL contra la lista blanca y que genere preguntas legibles.
+
 **Correr local** (desde `dashboard-app/`; necesita salida a `api.groq.com` y a staging):
 
 ```bash
@@ -331,30 +414,49 @@ GROQ_API_KEY=<key> \
 npm run eval:ia
 # opcionales: EVAL_IA_TENANT (chickin-demo) · EVAL_IA_MES (2026-08) · EVAL_IA_TZ (America/Monterrey)
 #             EVAL_IA_AHORA (ISO o 'real') · EVAL_IA_UMBRAL (0.9) · EVAL_IA_PAUSA_MS (3000)
-#             EVAL_IA_SOLO=trampa,c05 (categorías o prefijos de id) · EVAL_IA_DIR · GROQ_MODEL
+#             EVAL_IA_SOLO=trampa,c05,g-x-pareja (categorías o prefijos de id/plantilla) · EVAL_IA_DIR · GROQ_MODEL
+#             EVAL_IA_MUESTRA (150; 0 = sólo banco) · EVAL_IA_SEMILLA (YYYYMMDD) · EVAL_IA_INCLUIR_BASE (1)
+#             EVAL_IA_MESES_GEN (3) · EVAL_IA_REINTENTOS (3) · EVAL_IA_MAX_ESPERA_MS (120000) · EVAL_IA_MAX_MIN (150)
 #             EVAL_IA_DETALLE_LOCAL=1 (detalle con datos, sólo local)
 ```
 
 Las variables son `EVAL_IA_*` a propósito: la eval nunca toma `SUPABASE_URL` /
 `SUPABASE_SERVICE_KEY` sueltas (en una máquina de desarrollo suelen ser de producción).
-Tarda ~10–20 min (57 preguntas, una a la vez, 3 s de pausa por el tope de Groq por minuto).
+Con los defaults (57 + 150) tarda ~50–90 min (una pregunta a la vez, pausas y esperas por
+los límites de Groq); sólo el banco (`EVAL_IA_MUESTRA=0`) ~10–20 min.
 
-**CI:** `.github/workflows/eval-ia.yml` corre **sólo a mano** (`workflow_dispatch`, con
-`solo`, `umbral`, `tenant`). **No** corre en `pull_request`: un PR podría cambiar el código
-que se ejecuta con la service key de staging. El job usa el environment **`eval-staging`**
-(Settings → Environments) con **revisores requeridos**: cada corrida espera aprobación antes
-de recibir los secrets. **Por configurar:** crear el environment `eval-staging` con
-revisores y, como secrets del environment, `SUPABASE_URL_STAGING` y
-`SUPABASE_SERVICE_KEY_STAGING` (los `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` del repo son de
-producción y no se usan); `GROQ_API_KEY` puede ser el del repo. Sube el reporte (sin datos)
-como artifact por **7 días** y lo pega en el resumen del job (`$GITHUB_STEP_SUMMARY`). Correrla
-antes de fusionar un cambio al chat es un paso manual de revisión.
+**CI:** `.github/workflows/eval-ia.yml` corre **a mano** (`workflow_dispatch`, con `solo`,
+`muestra`, `semilla`, `incluir_base`, `umbral`, `tenant`) y **cada noche** (`schedule`,
+08:17 UTC). **No** corre en `pull_request`: un PR podría cambiar el código que se ejecuta
+con la service key de staging. El environment se elige por evento
+(`github.event_name == 'schedule' && 'eval-staging-nightly' || 'eval-staging'`):
+
+- **Manual → `eval-staging`**, con **revisores requeridos**: cada corrida espera aprobación
+  antes de recibir los secrets.
+- **Nocturna → `eval-staging-nightly`**. Un environment con revisores **bloquea** los
+  `schedule` hasta que alguien apruebe (cada noche). Opciones del dueño: (a) crear
+  `eval-staging-nightly` **sin revisores** pero con *Deployment branches and tags* =
+  *Selected branches* → sólo `main` (sólo código ya fusionado recibe los secrets; `schedule`
+  además sólo corre desde la rama por defecto), o (b) ponerle revisores y aprobar cada
+  mañana.
+
+**Por configurar:** crear ambos environments y, en **cada uno**, los secrets
+`SUPABASE_URL_STAGING` y `SUPABASE_SERVICE_KEY_STAGING` (los `SUPABASE_URL`/
+`SUPABASE_SERVICE_KEY` del repo son de producción y no se usan); `GROQ_API_KEY` puede ser el
+del repo. Sube el reporte (sin datos) como artifact por **7 días** (nocturna: **30**, para la
+tendencia) y lo pega en el resumen del job (`$GITHUB_STEP_SUMMARY`). La nocturna usa la
+semilla del día (otra muestra cada noche); para repetir una corrida, dispárala a mano con
+esa `semilla`. Una manual en curso no la cancela la nocturna (espera). Correrla antes de
+fusionar un cambio al chat sigue siendo un paso manual de revisión.
 
 **Pruebas sin red:** `src/__tests__/verificador-numeros.test.ts`,
 `src/__tests__/chat-verificador-numeros.test.ts` (ruta completa: texto, voz, reparación con y
-sin consulta, gráficas), `evals/ia/puntaje.test.ts` y `evals/ia/correr.test.ts` (config,
-reloj, bloqueo de escrituras, corrida con mocks y reglas del SQL del banco). Corren en la
-suite normal.
+sin consulta, gráficas), `evals/ia/puntaje.test.ts` (puntaje, Wilson, por plantilla,
+tendencia), `evals/ia/correr.test.ts` (config, reloj, bloqueo de escrituras, corrida con
+mocks, reglas del SQL del banco, 429/retry-after/backoff, cuota diaria, reemplazos,
+presupuesto de tiempo, `armarLista`) y `evals/ia/generador.test.ts` (plantillas, ids
+deterministas, SQL contra la lista blanca portada, degeneradas, descubrimiento simulado,
+muestreo reproducible y estratificado, reserva). Corren en la suite normal.
 
 **JEV:** no se usa en la eval. Su único caso cerrado de contradicciones
 (`contradiction_check`) tiene un esquema fijo de *reporte de entrega de software*
@@ -396,28 +498,136 @@ Dos botones en el compositor del chat (`components/chat/ComposerChat.tsx`):
 | Botón | Qué hace | Piezas |
 |---|---|---|
 | **Micrófono** (voice note) | graba → transcribe → el texto queda en la caja para revisar y enviar | `hooks/useGrabadora.ts`, `/api/transcribe` |
-| **Ondas** (Habla con tu restaurante) | conversación por turnos: escucha → detecta fin de frase → `/api/chat` con `modo:'voz'` → habla la respuesta → vuelve a escuchar | `hooks/useModoVoz.ts`, `components/chat/ModoVozPanel.tsx` |
+| **Ondas** (Habla con tu restaurante) | **plática continua** tipo llamada: escucha → fin de turno → `/api/chat` con `modo:'voz'` + historial → contesta con voz natural → sigue escuchando (se le puede interrumpir hablando) | `hooks/useModoVoz.ts`, `components/chat/ModoVozPanel.tsx`, `lib/voz/*` |
 
-- **Transcripción:** `/api/transcribe` → Groq Whisper (`STT_MODEL`, default
-  `whisper-large-v3-turbo`, `language=es`). Auth `requireTenant`; máx. 4 MB; 20/min dictado,
-  30/min modo voz; 429 de Groq → "Límite gratuito alcanzado". No se guardan audios ni
-  transcripciones en logs.
-- **Cerebro:** el mismo `/api/chat` (no el viejo `/api/voice`). `modo:'voz'` agrega la
-  instrucción de respuesta hablada (2–4 frases, sin tablas ni links, cifras con dígitos: el
-  cliente las dice en palabras con `textoParaHablar`, y el servidor las verifica — §3c).
-- **Voz de salida:** `speechSynthesis` del navegador (es-MX preferida). Calidad según
-  dispositivo: buena en iPhone/Mac, robótica en algunos Android/Windows.
-- **Detección de voz:** `lib/voz/vad.ts` (piso de ruido adaptable, 1.2 s de silencio cierra
-  el turno, mínimo 0.6 s de voz real). Si un comedor ruidoso dispara de más, ajustar
-  `umbralMin`/`factorRuido`.
-- **iOS:** el micrófono se suelta mientras habla (si no, WebKit manda el audio al auricular) y
-  se reabre al escuchar. Pendiente probar en iPhone real.
-- **Cambio futuro a voz en tiempo real:** la UI sólo habla con `transcribir()` / `hablar()`
-  en `lib/voz/proveedores.ts`. Un proveedor de pago (p. ej. OpenAI Realtime) se registra ahí y
-  se elige con `NEXT_PUBLIC_VOZ_PROVEEDOR`. Diseño acordado para ese momento: token temporal
-  creado por el servidor, **una sola tool de lectura** `consultar_restaurante(pregunta)` que
-  llama a `/api/chat` (para heredar todas las reglas de la sección 1), tope de minutos por
-  restaurante. Hoy **no** hay proveedor de pago: decisión de costo cero.
+Queja que motivó la versión actual (dueño, Mac + Chrome, sep 2026): *"la voz es demasiado
+robótica y debe de ser una charla continua, no sólo que lea mi voz"*. Restricción: costo cero.
+
+### Piezas
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| Transcripción | `/api/transcribe` → Groq Whisper (`STT_MODEL`, default `whisper-large-v3-turbo`, `language=es`) | Auth `requireTenant`; máx. 4 MB; 20/min dictado, 30/min modo voz; 429 → "Límite gratuito alcanzado". No se guardan audios ni transcripciones en logs. |
+| Cerebro | el mismo `/api/chat`, `modo:'voz'` | Agrega `instruccionModoVoz()` (abajo). Manda los últimos **10** mensajes usuario/asistente (`MAX_HISTORIAL_VOZ`; el chat escrito usa 8) para que "¿y ayer?" funcione. Cifras con dígitos: las verifica el servidor (§3c) y el cliente las dice en palabras (`texto-hablado.ts`). |
+| Voz de salida | `lib/voz/voz-natural.ts` detrás de `hablar()` (`lib/voz/proveedores.ts`, misma interfaz) | **Piper** (voz neuronal, en el navegador) con respaldo automático a `speechSynthesis`. |
+| Fin de turno | `lib/voz/vad.ts` | Piso de ruido adaptable; cierra a **~0.6 s** de silencio si la voz se fue apagando (fin natural de frase) o **~0.85 s** si se cortó con energía (pausa para pensar). Antes 1.2 s fijos. Mínimo 0.6 s de voz real. |
+| Interrumpir hablando | `lib/voz/barge-in.ts` | Ver abajo. |
+| Subtítulo en vivo | `lib/voz/transcripcion-en-vivo.ts` | `webkitSpeechRecognition` de Chrome/Edge con resultados intermedios, **sólo pantalla** (la pregunta sale de Whisper). En Chrome ese audio lo procesa el servicio de voz de Google. No en Safari/iOS. |
+
+### Voz natural (Piper)
+
+- **Librería:** `@mintplex-labs/piper-tts-web` 1.0.5 (MIT; fork de `@diffusionstudio/vits-web`)
+  + `onnxruntime-web` 1.23.2 (MIT, sólo backend WASM) + `@diffusionstudio/piper-wasm` 1.0.0
+  (fonémico = **espeak-ng compilado a WASM, GPL-3.0**; ver límites).
+- **Voces** (ids verificados en la librería instalada; se prueban en orden):
+  1. `es_MX-claude-high` — 22 kHz, **63.1 MB**. Dataset HirCoir/Piper-TTS-Spanish, **Apache-2.0** (MODEL_CARD).
+  2. `es_MX-ald-medium` — 22 kHz, **63.2 MB**. Dataset Ald_Mexican_Spanish_speech_dataset, **Unlicense**.
+  Se bajan de `huggingface.co/diffusionstudio/piper-voices` (espejo de `rhasspy/piper-voices`
+  que usa la librería; la URL está fija en ella).
+- **Nunca en el bundle principal.** `public/voz/piper-worker.js` es un worker **estático**; la
+  librería, onnxruntime y el fonémico los copia `scripts/copiar-motor-voz.mjs` (corre antes de
+  `next dev`/`next build`) de `node_modules` a `public/voz/vendor/<paquete>-<versión>/` y escribe
+  `public/voz/motor.json` con las rutas (ambos en `.gitignore`). El script reescribe el único
+  `import("onnxruntime-web/wasm")` de la librería a la ruta copiada; si una versión nueva cambia
+  eso, la prueba `voz-motor-piper-empaque` truena en CI y el script sólo avisa (no rompe el
+  deploy: sin `motor.json` la voz cae al respaldo). El cliente
+  (`lib/voz/piper-cliente.ts`, chunk aparte de ~4 KB) se importa dinámicamente al abrir el modo voz.
+- **Primera vez:** ~63 MB de modelo (Hugging Face) + ~31 MB de motor desde nuestro origen
+  (onnxruntime 12 MB + espeak-ng 18.7 MB + librería 0.3 MB). El panel muestra
+  *"Preparando voz… N% (solo la primera vez)"*. **No se espera la descarga:** mientras tanto
+  contesta la voz del navegador. El modelo queda en **OPFS** (carpeta `piper`, escrito en
+  streaming con `createSyncAccessHandle` desde el worker, también en Safari) y el motor en la
+  caché HTTP (`/voz/vendor/*` con `Cache-Control: immutable`; rutas con versión).
+- **Precarga:** al abrir el widget del chat, si es escritorio o Wi-Fi/Ethernet y sin "ahorro de
+  datos" ni red lenta, el worker baja el modelo a OPFS en segundo plano (una vez por página;
+  si ya está, no baja nada; no crea la sesión de inferencia).
+- **Tubería** (`lib/voz/tuberia.ts`): la respuesta se parte en frases (`frasesParaHablar`: la
+  primera ≤ 90 caracteres, trozos < 12 se juntan, el punto decimal no parte). Suena la frase 1
+  mientras el worker sintetiza la 2 (máximo 1 por delante). Salida por **Web Audio** en el
+  mismo `AudioContext` del micrófono (el cancelador de eco la ve) con un analizador que da el
+  nivel de salida para el barge-in. Al arrancar se "calienta" el modelo y se pre-sintetizan los
+  acuses con prioridad baja.
+- **Acuse:** si la respuesta tarda > **1.5 s** desde que el dueño se calló, se dice uno corto
+  ("Mmm, déjame ver…", "Va, reviso…", "A ver, dame un segundo…", "Déjame checar…", rotando;
+  con Piper quedan en caché). La respuesta espera a que termine el acuse.
+
+### Respaldo automático (`lib/voz/motor-voz.ts`)
+
+| Caso | Qué pasa |
+|---|---|
+| Sin WebAssembly, Worker o AudioContext | `speechSynthesis` desde el inicio |
+| `navigator.deviceMemory` < 4 GB (sólo Chrome lo reporta) | `speechSynthesis` |
+| `NEXT_PUBLIC_VOZ_MOTOR=navegador` | Piper apagado sin tocar código |
+| Descarga/inicio de un modelo falla | se prueba el siguiente; el que falló se salta 1 día (localStorage `fullsite.voz.motor.v1`); si ninguno → respaldo |
+| **Primera frase > 2.5 s** en sintetizarse | se habla TODA esa respuesta con el respaldo desde la frase 0, respaldo por el resto de la sesión; el modelo queda "lento" 30 días en ese equipo (la próxima vez se prueba el siguiente; si todos son lentos, respaldo directo sin descargar) |
+| Síntesis truena o se cuelga (> 10 s) a media respuesta | el respaldo sigue **desde esa frase**; respaldo por la sesión |
+
+Voz del navegador (respaldo) mejorada (`lib/voz/voces.ts`): Premium/Enhanced/Mejorada/Natural
+es-MX > **Google español de Estados Unidos** (voz en línea de Chrome) > Premium es-US/419 >
+Google español (es-ES) > es-MX normal > es-US > es-ES; compactas (`voiceURI` `…compact…`) y
+voces "de broma" de Apple al final. `rate` 1.05, `pitch` 1.0.
+
+### Interrumpir (barge-in)
+
+- **Tocando** el círculo: siempre (también en iOS y con el respaldo).
+- **Hablando** — sólo con voz natural (Piper por Web Audio) y fuera de iOS. El micrófono sigue
+  abierto mientras responde (`getUserMedia` con `echoCancellation`, `noiseSuppression`,
+  `autoGainControl`), y `barge-in.ts` decide cada 50 ms:
+  - umbral **adaptativo** = máx(0.04, ruido × 3, salida × acople × 2.5). `acople` = cuánto de la
+    salida se cuela al micrófono después del cancelador de eco; se aprende mientras nadie
+    habla (sube rápido, baja lento; arranca conservador en 0.3 y se ajusta en ~1–2 s).
+  - **ventana sorda de 250 ms** al inicio de cada frase (el cancelador se reajusta).
+  - al primer cuadro por encima del umbral empieza a **grabar ya** ("posible"); con **≥ 300 ms
+    sostenidos** (huecos ≤ 120 ms entre sílabas) calla la voz y lo grabado se queda como inicio
+    del turno del dueño; si no se sostiene, se tira.
+  - si el dueño empieza justo cuando la respuesta termina, su voz ya grabada tampoco se pierde.
+- Con `speechSynthesis` el audio no pasa por Web Audio (el cancelador de eco no lo ve y no hay
+  nivel de salida): **sólo tocando**. Si Piper cae al respaldo a media respuesta, el barge-in
+  se apaga en ese momento.
+- **iOS:** el micrófono se suelta mientras habla (si no, WebKit manda la voz al auricular) y se
+  reabre al escuchar: sólo tocando. Pendiente probar en iPhone real.
+
+### Plática continua
+
+- "Te escucho…" siempre visible mientras escucha; subtítulo en vivo de lo que dice el dueño
+  (Chrome/Edge); la frase que está sonando se resalta (`aria-current`).
+- Sigue hasta que el dueño cierre o **60 s sin que nadie hable** → "¿Seguimos?" (se suelta el
+  micrófono; tocar el círculo o "Seguir" reanuda).
+- Instrucción de voz (`lib/voz/instruccion-voz.ts`): 1–3 oraciones cortas, la primera es la
+  respuesta directa; español de México natural ("va", "órale" sin forzar); nunca enumerar más de
+  3 cosas (resume y ofrece "¿Te los mando en pantalla?"); usa lo ya platicado para preguntas
+  cortas; pregunta de seguimiento sólo si ayuda; cifras con dígitos.
+
+### CSP y caché (cambios, `next.config.ts`)
+
+| Directiva | Cambio | Por qué |
+|---|---|---|
+| `connect-src` | **+ `https://huggingface.co https://*.huggingface.co https://*.hf.co`** | el worker baja el modelo; Hugging Face redirige a su CDN (`*.hf.co`, p. ej. `cas-bridge.xethub.hf.co`, `cdn-lfs*.hf.co`) |
+| `script-src` | sin cambio | librería, onnxruntime (`.mjs`) y worker salen de `'self'`; WebAssembly ya compila con `'unsafe-eval'` |
+| `worker-src` | sin agregar | cae en `script-src` (`'self'`); agregarla podría romper workers `blob:` de terceros |
+| headers | `/voz/vendor/:path*` → `public, max-age=31536000, immutable`; `/voz/motor.json` y `/voz/piper-worker.js` → `no-cache` | 31 MB que no deben bajarse dos veces; las rutas llevan versión |
+
+Además: `public/sw.js` **no intercepta** Hugging Face ni `/voz/` (si no, el catch-all
+stale-while-revalidate guardaba ~100 MB extra por terminal); `CACHE_VERSION` no se subió a
+propósito (no hace falta vaciar la caché del POS por esto). `scripts/build-capacitor-offline.sh`
+aparta `public/voz/vendor` (la app nativa no lo usa).
+
+### Latencia esperada
+
+Del fin de la frase del dueño a oír la respuesta: ~0.6–0.85 s (fin de turno) + Whisper
+(~0.3–0.8 s) + `/api/chat` (1–4 s; más si hace consultas) + primera frase de Piper (fonémico
+~0.1–0.2 s por frase + inferencia; en un escritorio moderno se espera ~0.3–0.8 s para una frase
+corta, **no medido aún con el modelo real**: el tope de 2.5 s decide). Si el cerebro tarda
+> 1.5 s suena el acuse. Interrumpir: la voz se calla ~0.3–0.4 s después de que el dueño empieza.
+
+### Cambio futuro a voz en tiempo real
+
+La UI sólo habla con `transcribir()` / `hablar()` en `lib/voz/proveedores.ts`. Un proveedor de
+pago (p. ej. OpenAI Realtime) se registra ahí y se elige con `NEXT_PUBLIC_VOZ_PROVEEDOR`. Diseño
+acordado para ese momento: token temporal creado por el servidor, **una sola tool de lectura**
+`consultar_restaurante(pregunta)` que llama a `/api/chat` (para heredar todas las reglas de la
+sección 1), tope de minutos por restaurante. Hoy **no** hay proveedor de pago: decisión de costo
+cero.
 
 ---
 
@@ -450,6 +660,7 @@ Dos botones en el compositor del chat (`components/chat/ComposerChat.tsx`):
 | `STT_MODEL` | Vercel (opcional) | modelo de transcripción |
 | `CRON_SECRET` | Vercel + GitHub | cron de agentes |
 | `NEXT_PUBLIC_VOZ_PROVEEDOR` | Vercel (opcional) | proveedor de voz futuro |
+| `NEXT_PUBLIC_VOZ_MOTOR` | Vercel (opcional) | `navegador` apaga la voz natural (Piper) y usa `speechSynthesis` (§5) |
 | `AI_GATEWAY_API_KEY`, `JEV_SHADOW_ENABLED=1` | Vercel | JEV (hoy apagado) |
 | `EVAL_IA_SUPABASE_URL`, `EVAL_IA_SUPABASE_SERVICE_KEY`, `GROQ_API_KEY` (+ `EVAL_IA_*` opcionales) | local / CI | eval de exactitud (§3c) |
 | `SUPABASE_URL_STAGING`, `SUPABASE_SERVICE_KEY_STAGING` | GitHub, secrets del environment `eval-staging` (con revisores; **por configurar**) | `eval-ia.yml` |
@@ -483,6 +694,26 @@ inteligencia de restaurante. Apagado hasta configurar sus variables.
 - **Reservaciones web** (`amalay_reservaciones`): sin entradas desde 2026-04-22; el flujo
   n8n/Make murió. Sin revisar.
 - **Voz en iPhone real** y umbrales de ruido en comedor: sin probar en dispositivo.
+- **Voz natural (§5), pendiente / límites conocidos:**
+  - **No se ha medido con el modelo real** (este entorno no llega a Hugging Face). Lo probado en
+    Chromium real (headless, CSP de producción) con un modelo ONNX falso del mismo formato:
+    descarga → OPFS → onnxruntime y espeak-ng desde `/voz/vendor` → tubería → Web Audio →
+    `callar()` en ~150 ms → segunda carga desde OPFS sin pedir nada a Hugging Face → respaldo
+    por "lento". Falta: velocidad real de `es_MX-claude-high` en la Mac del dueño, en Android y en
+    iPhone (el tope de 2.5 s decide solo).
+  - Barge-in **sin probar con bocinas reales**: depende del cancelador de eco del navegador.
+    Un salto brusco de volumen a media respuesta puede parecer voz (el acople se reaprende en
+    ~1–2 s); con audífonos no hay eco.
+  - Sin interrumpir hablando con la voz del navegador, ni en iOS (sólo tocando).
+  - **Licencia:** el fonémico es espeak-ng (**GPL-3.0**) compilado a WASM y lo servimos desde
+    nuestro origen; revisar la obligación de ofrecer su código fuente (es público) antes de
+    vender esto fuera de AMALAY. Modelos: Apache-2.0 (claude) / Unlicense (ald).
+  - Primera vez ~94 MB en total; en Safari viejo sin OPFS se volvería a bajar cada sesión.
+  - La librería re-crea el módulo de espeak-ng por frase (~0.1–0.2 s de CPU cada una).
+  - Lo que sigue distinto a una voz de pago en tiempo real: no hay *streaming* de la respuesta
+    (el chat devuelve el texto completo y luego se habla), no hay turnos por prosodia/semántica
+    (el fin de turno es por silencio), no hay "mhm" mientras el dueño habla, la voz no cambia de
+    emoción, y Whisper corre después de que el dueño se calla (no en vivo).
 - **Lectura universal (3b), pendiente:**
   - Correr la eval (§3c) contra staging con Groq real: todavía **no se ha corrido** (este
     entorno no llega a `api.groq.com` ni a staging); falta agregar los secrets de staging.

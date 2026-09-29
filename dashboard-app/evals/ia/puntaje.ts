@@ -105,6 +105,8 @@ export type Estado = 'aprobada' | 'fallida' | 'omitida'
 
 /** Prefijo del motivo de una omisión por falla de infraestructura (Groq caído, 429 persistente). */
 export const MOTIVO_INFRA = 'infraestructura'
+/** Omisión de la pregunta en la que Groq agotó la cuota diaria (la corrida se detiene ahí). */
+export const MOTIVO_CUOTA = `${MOTIVO_INFRA}: cuota diaria de Groq agotada (no es error del modelo)`
 /** Si más de esta fracción de preguntas se omite por infraestructura, la corrida no es válida. */
 export const MAX_FRACCION_INFRA = 0.1
 
@@ -157,6 +159,8 @@ export function calificarTrampa(respuesta: string, prohibido: string[] = []): Ca
 export interface ResultadoPregunta {
   id: string
   categoria: Categoria
+  /** Plantilla del generador (sólo preguntas generadas; su id es fijo, no es dato). */
+  plantilla?: string
   estado: Estado
   /** Motivo de omisión: texto FIJO (nunca un mensaje de la base). */
   motivo?: string
@@ -169,12 +173,30 @@ export interface ResultadoPregunta {
   verificador: { afirmaciones: number; sin_rastro: number; reparado: boolean; marcados: number } | null
 }
 
+/** Cómo terminó la corrida (paro ordenado por cuota o tiempo, reemplazos de degeneradas). */
+export interface InfoCorrida {
+  detenida: 'cuota' | 'tiempo' | null
+  /** Preguntas de la lista que ya no se corrieron por el paro (no cuentan en nada). */
+  noCorridas: number
+  /** Generadas degeneradas / sin datos cambiadas por otra de la reserva. */
+  reemplazos: number
+  /** Reintentos por 429 de Groq. */
+  esperas429: number
+}
+
+export interface Conteo { evaluadas: number; aprobadas: number; omitidas: number }
+
 export interface Resumen {
   total: number
   evaluadas: number
   aprobadas: number
   exactitud: number
-  porCategoria: Record<string, { evaluadas: number; aprobadas: number; omitidas: number }>
+  /** Intervalo de confianza de 95% (Wilson) de la exactitud. */
+  ic95: [number, number]
+  porCategoria: Record<string, Conteo>
+  /** Por plantilla del generador; las del banco escrito a mano van juntas en `banco`. */
+  porPlantilla: Record<string, Conteo>
+  corrida: InfoCorrida | null
   trampasFallidas: string[]
   omitidas: string[]
   /** Omitidas porque el chat no respondió (no por falta de datos). */
@@ -182,21 +204,45 @@ export interface Resumen {
   verificador: { reparadas: number; conMarcas: number }
 }
 
-export function resumir(rs: ResultadoPregunta[]): Resumen {
+/**
+ * Intervalo de Wilson (95% por defecto) para k aciertos de n. Con n chico no se sale de
+ * [0, 1] ni colapsa a un punto como el intervalo normal. n = 0 → [0, 1].
+ */
+export function wilson(k: number, n: number, z = 1.96): [number, number] {
+  if (n <= 0) return [0, 1]
+  const p = k / n
+  const z2 = z * z
+  const den = 1 + z2 / n
+  const centro = (p + z2 / (2 * n)) / den
+  const margen = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / den
+  return [Math.max(0, centro - margen), Math.min(1, centro + margen)]
+}
+
+export const PLANTILLA_BANCO = 'banco'
+
+export function resumir(rs: ResultadoPregunta[], corrida: InfoCorrida | null = null): Resumen {
   const evaluadas = rs.filter(r => r.estado !== 'omitida')
   const aprobadas = evaluadas.filter(r => r.estado === 'aprobada')
   const porCategoria: Resumen['porCategoria'] = {}
-  for (const r of rs) {
-    const c = (porCategoria[r.categoria] ||= { evaluadas: 0, aprobadas: 0, omitidas: 0 })
+  const porPlantilla: Resumen['porPlantilla'] = {}
+  const contar = (m: Record<string, Conteo>, k: string, r: ResultadoPregunta) => {
+    const c = (m[k] ||= { evaluadas: 0, aprobadas: 0, omitidas: 0 })
     if (r.estado === 'omitida') c.omitidas++
     else { c.evaluadas++; if (r.estado === 'aprobada') c.aprobadas++ }
+  }
+  for (const r of rs) {
+    contar(porCategoria, r.categoria, r)
+    contar(porPlantilla, r.plantilla ?? PLANTILLA_BANCO, r)
   }
   return {
     total: rs.length,
     evaluadas: evaluadas.length,
     aprobadas: aprobadas.length,
     exactitud: evaluadas.length > 0 ? aprobadas.length / evaluadas.length : 0,
+    ic95: wilson(aprobadas.length, evaluadas.length),
     porCategoria,
+    porPlantilla,
+    corrida,
     trampasFallidas: rs.filter(r => r.categoria === 'trampa' && r.estado === 'fallida').map(r => r.id),
     omitidas: rs.filter(r => r.estado === 'omitida').map(r => r.id),
     fallasInfra: rs.filter(r => r.estado === 'omitida' && (r.motivo || '').startsWith(MOTIVO_INFRA)).map(r => r.id),
@@ -216,8 +262,11 @@ export function pasaCompuerta(r: Resumen, umbral: number): { ok: boolean; motivo
   if (r.evaluadas === 0) motivos.push('ninguna pregunta se pudo evaluar')
   if (r.exactitud < umbral) motivos.push(`exactitud ${(r.exactitud * 100).toFixed(1)}% < umbral ${(umbral * 100).toFixed(1)}%`)
   if (r.trampasFallidas.length > 0) motivos.push(`trampas fallidas (dato inventado): ${r.trampasFallidas.join(', ')}`)
-  if (r.total > 0 && r.fallasInfra.length / r.total > MAX_FRACCION_INFRA) {
-    motivos.push(`corrida no válida: ${r.fallasInfra.length} de ${r.total} preguntas sin respuesta del chat (infraestructura)`)
+  // La pregunta en la que se agotó la cuota diaria no cuenta: la corrida se detuvo ahí a
+  // propósito (reporte parcial), no es un chat que falla una y otra vez.
+  const infra = r.fallasInfra.length - (r.corrida?.detenida === 'cuota' ? 1 : 0)
+  if (r.total > 0 && infra / r.total > MAX_FRACCION_INFRA) {
+    motivos.push(`corrida no válida: ${infra} de ${r.total} preguntas sin respuesta del chat (infraestructura)`)
   }
   return { ok: motivos.length === 0, motivos }
 }
@@ -225,20 +274,61 @@ export function pasaCompuerta(r: Resumen, umbral: number): { ok: boolean; motivo
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`
 const celda = (s: string) => s.replace(/\|/g, '\\|').replace(/\n+/g, ' ').slice(0, 300)
 
-export function reporteMarkdown(rs: ResultadoPregunta[], r: Resumen, meta: { tenant: string; mes: string; ahora: string; umbral: number; modelo: string }): string {
+export interface MetaReporte {
+  tenant: string; mes: string; ahora: string; umbral: number; modelo: string
+  semilla?: string; muestra?: number; incluirBase?: boolean; stamp?: string
+}
+
+/** Info de la lista que el reporte muestra (sólo conteos). */
+export interface InfoListaReporte {
+  generadas: number; muestra: number; base: number; dominios: Record<string, number>; erroresDescubrimiento: Record<string, string>
+}
+
+const ic = (c: Conteo) => { const [a, b] = wilson(c.aprobadas, c.evaluadas); return c.evaluadas > 0 ? `${pct(a)}–${pct(b)}` : '—' }
+const exac = (c: Conteo) => (c.evaluadas > 0 ? pct(c.aprobadas / c.evaluadas) : '—')
+
+export function reporteMarkdown(rs: ResultadoPregunta[], r: Resumen, meta: MetaReporte, info?: InfoListaReporte): string {
   const compuerta = pasaCompuerta(r, meta.umbral)
   const l: string[] = []
-  l.push(`# Eval IA del dueño — ${compuerta.ok ? 'PASA' : 'NO PASA'}`)
+  l.push(`# Eval IA del dueño — ${compuerta.ok ? 'PASA' : 'NO PASA'}${r.corrida?.detenida ? ' (CORRIDA PARCIAL)' : ''}`)
   l.push('')
-  l.push(`Tenant \`${meta.tenant}\` · mes ${meta.mes} · reloj fijado ${meta.ahora} · modelo ${meta.modelo}`)
+  l.push(`Tenant \`${meta.tenant}\` · mes ${meta.mes} · reloj fijado ${meta.ahora} · modelo ${meta.modelo}`
+    + (meta.semilla ? ` · semilla ${meta.semilla}` : ''))
+  if (info) {
+    l.push('')
+    l.push(`Preguntas: ${info.base} del banco + ${info.muestra} generadas (muestra de ${info.generadas} posibles para este tenant).`
+      + ` Dominios: ${Object.entries(info.dominios).map(([k, v]) => `${k} ${v}`).join(', ') || '—'}.`
+      + (Object.keys(info.erroresDescubrimiento).length ? ` Descubrimiento con error: ${Object.entries(info.erroresDescubrimiento).map(([k, v]) => `${k} [${v}]`).join(', ')}.` : ''))
+  }
   l.push('')
-  l.push(`**Exactitud: ${pct(r.exactitud)}** (${r.aprobadas}/${r.evaluadas} evaluadas; umbral ${pct(meta.umbral)}). Omitidas: ${r.omitidas.length}.`)
+  l.push(`**Exactitud: ${pct(r.exactitud)}** (IC 95%: ${pct(r.ic95[0])}–${pct(r.ic95[1])}; ${r.aprobadas}/${r.evaluadas} evaluadas; umbral ${pct(meta.umbral)}). Omitidas: ${r.omitidas.length}.`)
+  if (r.corrida?.detenida) {
+    l.push('')
+    l.push(`**Corrida parcial:** se detuvo por ${r.corrida.detenida === 'cuota' ? 'cuota diaria de Groq agotada' : 'presupuesto de tiempo'}; `
+      + `${r.corrida.noCorridas} preguntas no se corrieron (no cuentan). Es infraestructura, no error del modelo.`)
+  }
+  if (r.corrida && (r.corrida.reemplazos || r.corrida.esperas429)) {
+    l.push('')
+    l.push(`Reemplazos de generadas degeneradas/sin datos: ${r.corrida.reemplazos}. Reintentos por 429 de Groq: ${r.corrida.esperas429}.`)
+  }
   if (!compuerta.ok) l.push(`\nMotivos: ${compuerta.motivos.join('; ')}`)
   l.push('')
-  l.push('| Categoría | Aprobadas | Evaluadas | Omitidas |')
-  l.push('|---|---|---|---|')
-  for (const [c, v] of Object.entries(r.porCategoria)) l.push(`| ${c} | ${v.aprobadas} | ${v.evaluadas} | ${v.omitidas} |`)
+  l.push('| Categoría | Aprobadas | Evaluadas | Omitidas | Exactitud | IC 95% |')
+  l.push('|---|---|---|---|---|---|')
+  for (const [c, v] of Object.entries(r.porCategoria)) l.push(`| ${c} | ${v.aprobadas} | ${v.evaluadas} | ${v.omitidas} | ${exac(v)} | ${ic(v)} |`)
   l.push('')
+  const plantillas = Object.entries(r.porPlantilla).filter(([, v]) => v.evaluadas > 0)
+  if (plantillas.length > 1 || (plantillas.length === 1 && plantillas[0][0] !== PLANTILLA_BANCO)) {
+    const peores = plantillas
+      .sort((a, b) => (a[1].aprobadas / a[1].evaluadas) - (b[1].aprobadas / b[1].evaluadas) || b[1].evaluadas - a[1].evaluadas || (a[0] < b[0] ? -1 : 1))
+      .slice(0, 20)
+    l.push('Plantillas que más fallan (hasta 20):')
+    l.push('')
+    l.push('| Plantilla | Aprobadas | Evaluadas | Exactitud |')
+    l.push('|---|---|---|---|')
+    for (const [k, v] of peores) l.push(`| ${k} | ${v.aprobadas} | ${v.evaluadas} | ${exac(v)} |`)
+    l.push('')
+  }
   l.push(`Verificador de números: ${r.verificador.reparadas} respuestas necesitaron reparación; ${r.verificador.conMarcas} quedaron con "[sin verificar]".`)
   if (r.fallasInfra.length > 0) l.push(`\nSin respuesta del chat (infraestructura, omitidas): ${r.fallasInfra.join(', ')}.`)
   l.push('')
@@ -255,4 +345,23 @@ export function reporteMarkdown(rs: ResultadoPregunta[], r: Resumen, meta: { ten
   l.push('')
   l.push('> La exactitud se MIDE sobre este banco; no se garantiza. Lo que sí se garantiza en producción es que ningún número sin rastro en los datos llega al dueño (verificador).')
   return l.join('\n')
+}
+
+/**
+ * Registro compacto para series de tiempo (una línea por corrida). Sin datos del
+ * restaurante: sólo conteos, exactitudes e ids de plantillas/categorías.
+ */
+export function tendencia(r: Resumen, meta: MetaReporte) {
+  const tasa = (c: Conteo) => ({ ...c, exactitud: c.evaluadas > 0 ? c.aprobadas / c.evaluadas : null })
+  return {
+    version: 1,
+    stamp: meta.stamp ?? null,
+    tenant: meta.tenant, mes: meta.mes, modelo: meta.modelo, semilla: meta.semilla ?? null, muestra: meta.muestra ?? null,
+    total: r.total, evaluadas: r.evaluadas, aprobadas: r.aprobadas, exactitud: r.exactitud, ic95: r.ic95,
+    trampasFallidas: r.trampasFallidas.length, omitidas: r.omitidas.length, fallasInfra: r.fallasInfra.length,
+    corrida: r.corrida,
+    porCategoria: Object.fromEntries(Object.entries(r.porCategoria).map(([k, v]) => [k, tasa(v)])),
+    porPlantilla: Object.fromEntries(Object.entries(r.porPlantilla).map(([k, v]) => [k, tasa(v)])),
+    pasa: pasaCompuerta(r, meta.umbral).ok,
+  }
 }

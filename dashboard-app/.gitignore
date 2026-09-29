@@ -18,6 +18,9 @@
 /out/
 # generado en build por scripts/gen-precache-manifest.mjs
 /public/precache-manifest.json
+# generados por scripts/copiar-motor-voz.mjs (motor de la voz natural, desde node_modules)
+/public/voz/vendor/
+/public/voz/motor.json
 
 # production
 /build

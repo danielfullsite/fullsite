@@ -158,6 +158,24 @@ describe('modo voz — un turno completo', () => {
   }, 10_000)
 })
 
+describe('modo voz — plática continua', () => {
+  it('cada pregunta de voz manda el historial de la plática (usuario/asistente) para que "¿y ayer?" se entienda', async () => {
+    transcripciones = ['¿Cuánto vendimos hoy?', '¿Y ayer?']
+    abrirModoVoz()
+    await decirAlgo()
+    await waitFor(() => expect(cuerposChat).toHaveLength(1), { timeout: 3000 })
+    expect(cuerposChat[0].history).toEqual([])
+    await waitFor(() => expect(screen.getByText('Escuchando')).toBeTruthy(), { timeout: 3000 })
+    await decirAlgo()
+    await waitFor(() => expect(cuerposChat).toHaveLength(2), { timeout: 4000 })
+    expect(cuerposChat[1]).toMatchObject({ message: '¿Y ayer?', modo: 'voz' })
+    expect(cuerposChat[1].history).toEqual([
+      { role: 'user', content: '¿Cuánto vendimos hoy?' },
+      { role: 'assistant', content: 'Hoy llevas **$12,533** 🚀. [Ver ventas →](/ventas)' },
+    ])
+  }, 15_000)
+})
+
 describe('modo voz — robustez', () => {
   it('la transcripción del modo voz va con ?modo=voz (límite propio en el servidor)', async () => {
     transcripciones = ['¿Cuánto vendimos hoy?']

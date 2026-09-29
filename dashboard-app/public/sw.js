@@ -186,6 +186,11 @@ self.addEventListener('fetch', (event) => {
   // Never cache auth or payment endpoints
   if (NEVER_CACHE_PATTERNS.some((p) => p.test(url.pathname))) return
 
+  // Voz natural (Piper): el modelo de Hugging Face (~63 MB) ya queda en OPFS y el
+  // motor de /voz/vendor (~31 MB) en la caché HTTP (inmutable). Guardarlos también
+  // en la caché del SW duplicaría ~100 MB por terminal. Nunca interceptar.
+  if (/(^|\.)(huggingface\.co|hf\.co)$/.test(url.hostname) || url.pathname.startsWith('/voz/')) return
+
   // El proxy de la terminal se juzga por la consulta que lleva adentro.
   const proxeada = consultaProxeada(url)
   if (proxeada) {

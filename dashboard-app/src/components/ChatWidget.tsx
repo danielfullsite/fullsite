@@ -7,7 +7,8 @@ import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
 import { hrefInternoSeguro } from '@/lib/chat-context'
 import { consultarChat, MENSAJE_ERROR_CHAT } from '@/lib/chat-cliente'
-import { MODO_VOZ } from '@/lib/voz/instruccion-voz'
+import { MAX_HISTORIAL_VOZ, MODO_VOZ } from '@/lib/voz/instruccion-voz'
+import { precargarVozNatural } from '@/lib/voz/voz-natural'
 import ComposerChat from '@/components/chat/ComposerChat'
 import ModoVozPanel from '@/components/chat/ModoVozPanel'
 import GraficaChat from '@/components/chat/GraficaChat'
@@ -129,10 +130,11 @@ export default function ChatWidget() {
   }, [isOpen, modoVoz])
 
   // Modo voz: el MISMO /api/chat, con modo 'voz' (respuesta corta, sin markdown).
-  // El historial se lee al momento de preguntar, antes de agregar la pregunta.
+  // El historial se lee al momento de preguntar, antes de agregar la pregunta: los
+  // últimos MAX_HISTORIAL_VOZ mensajes (usuario/asistente), para que "¿y ayer?" se entienda.
   const preguntarPorVoz = useCallback((texto: string, signal: AbortSignal) => consultarChat({
     message: texto,
-    history: messagesRef.current.slice(-6),
+    history: messagesRef.current.filter(m => m.role === 'user' || m.role === 'assistant').slice(-MAX_HISTORIAL_VOZ),
     clientId: clientId || getActiveClientSlug(),
     modo: MODO_VOZ,
     signal,
@@ -151,6 +153,12 @@ export default function ChatWidget() {
   // Focus input when opened
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 300)
+  }, [isOpen])
+
+  // Voz natural: al abrir el chat, en escritorio/Wi-Fi, se baja el modelo en segundo
+  // plano (una vez; si ya está guardado no baja nada) para que el modo voz no espere.
+  useEffect(() => {
+    if (isOpen) precargarVozNatural()
   }, [isOpen])
 
   async function sendMessage(text: string) {

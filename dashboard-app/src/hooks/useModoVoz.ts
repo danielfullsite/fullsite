@@ -1,28 +1,44 @@
 'use client'
 
-// "Habla con tu restaurante": conversación por turnos, manos libres.
+// "Habla con tu restaurante": plática continua, manos libres (como una llamada).
 //
 //   preparando → escuchando ─(VAD: fin)→ pensando ─(transcribe + chat)→ hablando ─┐
-//                    ▲                                                            │
-//                    └────────────────────────────────────────────────────────────┘
+//                  ▲   ▲                    │ (> 1.5 s: "Mmm, déjame ver…")        │
+//                  │   └──── el dueño habla encima (barge-in) ◄───────────────────┤
+//                  └──────────────────────────────────────────────────────────────┘
+//   60 s sin que nadie hable → pausado ("¿Seguimos?", tocar para seguir)
 //
-// - Al abrir se calibra el ruido del lugar (~300 ms) antes de escuchar.
-// - Mientras habla, el micrófono se IGNORA (sin VAD ni grabación): si no, la bocina se
-//   escucha a sí misma y el ciclo nunca termina. Tocar interrumpe y vuelve a escuchar.
+// - Al abrir se calibra el ruido del lugar (~300 ms) antes de escuchar, y en
+//   paralelo se prepara la voz natural (Piper; la primera vez baja ~63 MB).
+// - Fin de turno adaptativo (lib/voz/vad): ~0.6 s si la frase se fue apagando,
+//   ~0.85 s si se cortó con energía.
+// - Interrumpir HABLANDO (lib/voz/barge-in): con voz natural (Web Audio) el micrófono
+//   sigue abierto mientras responde; voz sostenida del dueño (≥ 300 ms, por encima
+//   del eco medido) calla la respuesta y lo que ya dijo se queda como inicio de su
+//   turno. Con la voz del navegador (speechSynthesis) el eco no se puede separar:
+//   sólo se interrumpe tocando. En iOS el micrófono se suelta mientras habla (si no,
+//   la voz sale por el auricular): sólo tocando.
 // - Transcripción vacía o ruido → vuelve a escuchar sin llamar al chat.
-// - El cerebro (`preguntar`) es el mismo /api/chat del chat escrito, con modo 'voz'.
+// - El cerebro (`preguntar`) es el mismo /api/chat del chat escrito, con modo 'voz'
+//   y el historial de la plática.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MAX_BYTES_AUDIO, mensajeErrorMicrofono, nivelVisual } from '@/lib/voz/audio'
 import {
+  BARGE_IN_POR_DEFECTO, estadoInicialBargeIn, pasoBargeIn, type ConfigBargeIn, type EstadoBargeIn,
+} from '@/lib/voz/barge-in'
+import {
   abrirMicrofono, audioContextCompartido, cerrarStream, crearGrabador, crearMedidor, ErrorMicrofono,
 } from '@/lib/voz/microfono'
-import { obtenerProveedoresVoz, type ProveedoresVoz } from '@/lib/voz/proveedores'
+import { obtenerProveedoresVoz, type EstadoCargaVoz, type ProveedoresVoz } from '@/lib/voz/proveedores'
+import { frasesParaHablar } from '@/lib/voz/texto-hablado'
+import { crearTranscripcionEnVivo, type TranscripcionEnVivo } from '@/lib/voz/transcripcion-en-vivo'
 import {
   estadoCalibrando, estadoInicialVad, pasoVad, ruidoDe, VAD_POR_DEFECTO, type ConfigVad, type EstadoVad,
 } from '@/lib/voz/vad'
+import { siguienteAcuse } from '@/lib/voz/voz-natural'
 
-export type FaseVoz = 'inactivo' | 'preparando' | 'escuchando' | 'pensando' | 'hablando' | 'error'
+export type FaseVoz = 'inactivo' | 'preparando' | 'escuchando' | 'pensando' | 'hablando' | 'pausado' | 'error'
 
 /** Cada cuánto se lee el micrófono. */
 const CUADRO_MS = 50
@@ -32,6 +48,10 @@ const REINICIO_SILENCIO_MS = 15_000
 const TROZO_MS = 1000
 /** Antes del tope del servidor (~4 MB, límite de cuerpo de Vercel) se cierra el enunciado. */
 const TOPE_BYTES_ENUNCIADO = Math.floor(MAX_BYTES_AUDIO * 0.9)
+/** Si la respuesta tarda más que esto (desde que el dueño se calló), un acuse corto. */
+export const ACUSE_DESPUES_MS = 1500
+/** Tanto tiempo sin que nadie hable → pausa ("¿Seguimos?") y se suelta el micrófono. */
+export const SILENCIO_PAUSA_MS = 60_000
 
 /**
  * iOS/WebKit: con el micrófono abierto, la voz sale por el AURICULAR (modo llamada) y
@@ -55,6 +75,11 @@ interface Opciones {
   alResponder?: (texto: string) => void
   proveedores?: ProveedoresVoz
   vad?: ConfigVad
+  bargeIn?: ConfigBargeIn
+  /** Pruebas: silencio que pausa la plática (default SILENCIO_PAUSA_MS). */
+  silencioPausaMs?: number
+  /** Pruebas: espera antes del acuse (default ACUSE_DESPUES_MS). */
+  acuseDespuesMs?: number
 }
 
 interface Sesion {
@@ -73,6 +98,15 @@ interface Sesion {
   /** Sube en cada interrupción/cierre: lo que venía en camino se ignora. */
   turno: number
   abort: AbortController | null
+  /** Interrupción por voz mientras habla (barge-in). */
+  bargeIn: EstadoBargeIn
+  bargeActivo: boolean
+  /** Cuándo empezó a sonar la frase actual (ventana sorda del barge-in). */
+  fraseDesde: number
+  /** Última vez que alguien habló (para la pausa por silencio). */
+  ultimaActividad: number
+  /** Cuándo cerró el último enunciado del dueño (para el acuse). */
+  finEnunciado: number
 }
 
 /**
@@ -84,19 +118,32 @@ export function prepararModoVozEnGesto(proveedores: ProveedoresVoz = obtenerProv
   audioContextCompartido()
 }
 
-export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: prov, vad: cfgVad = VAD_POR_DEFECTO }: Opciones) {
+export function useModoVoz({
+  preguntar, alPreguntar, alResponder, proveedores: prov, vad: cfgVad = VAD_POR_DEFECTO, bargeIn: cfgBarge = BARGE_IN_POR_DEFECTO,
+  silencioPausaMs = SILENCIO_PAUSA_MS, acuseDespuesMs = ACUSE_DESPUES_MS,
+}: Opciones) {
   const [fase, setFase] = useState<FaseVoz>('inactivo')
   const [nivel, setNivel] = useState(0)
   const [usuarioHablando, setUsuarioHablando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ultimaPregunta, setUltimaPregunta] = useState('')
   const [ultimaRespuesta, setUltimaRespuesta] = useState('')
+  /** Frases (con dígitos) de la respuesta que se está diciendo, y cuál suena. */
+  const [frases, setFrases] = useState<string[]>([])
+  const [fraseActual, setFraseActual] = useState(-1)
+  /** Subtítulo en vivo de lo que va diciendo el dueño (si el navegador puede). */
+  const [enVivo, setEnVivo] = useState('')
+  const [cargaVoz, setCargaVoz] = useState<EstadoCargaVoz>({ estado: 'inactivo' })
+  /** Mientras habla, ¿se le puede interrumpir hablando? (para la pista en pantalla) */
+  const [interrumpePorVoz, setInterrumpePorVoz] = useState(false)
 
   const faseRef = useRef<FaseVoz>('inactivo')
   /** Sube en cada abrir/cerrar/desmontar: un getUserMedia que llega tarde se descarta. */
   const intentoRef = useRef(0)
   const sesionRef = useRef<Sesion | null>(null)
   const montadoRef = useRef(true)
+  const acuseRef = useRef(-1)
+  const vivoRef = useRef<TranscripcionEnVivo | null>(null)
   const cb = useRef({ preguntar, alPreguntar, alResponder })
   useEffect(() => { cb.current = { preguntar, alPreguntar, alResponder } }, [preguntar, alPreguntar, alResponder])
   const proveedoresRef = useRef<ProveedoresVoz | null>(prov ?? null)
@@ -105,11 +152,21 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     return proveedoresRef.current
   }, [])
 
+  const vivo = useCallback((): TranscripcionEnVivo | null => {
+    if (!vivoRef.current && !debeSoltarMicAlHablar()) {
+      vivoRef.current = crearTranscripcionEnVivo(t => { if (montadoRef.current && faseRef.current === 'escuchando') setEnVivo(t) })
+    }
+    return vivoRef.current
+  }, [])
+
   const cambiar = useCallback((f: FaseVoz) => {
     faseRef.current = f
     if (montadoRef.current) setFase(f)
     if (f !== 'escuchando') setUsuarioHablando(false)
-  }, [])
+    // El subtítulo en vivo sólo corre mientras escucha.
+    if (f === 'escuchando') vivo()?.iniciar()
+    else vivoRef.current?.detener()
+  }, [vivo])
 
   const detenerGrabador = useCallback((s: Sesion) => {
     const g = s.grabador
@@ -154,12 +211,34 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     s.vad = estadoInicialVad(ruidoDe(s.vad))
     iniciarGrabador(s)
     setError(null)
+    if (montadoRef.current) { setEnVivo(''); setFraseActual(-1) }
     cambiar('escuchando')
   }, [cambiar, iniciarGrabador])
+
+  /**
+   * El dueño ya está hablando (interrumpió, o empezó justo al terminar la respuesta):
+   * se calla lo que suene y lo que YA se grabó queda como el inicio de su turno.
+   */
+  const tomarTurno = useCallback((s: Sesion, inicioVoz: number, vozMs: number) => {
+    s.turno++
+    s.abort?.abort()
+    s.abort = null
+    proveedores().voz.callar()
+    const ahora = Date.now()
+    s.vad = { fase: 'hablando', ruido: ruidoDe(s.vad), inicio: inicioVoz, ultimaVoz: ahora, vozMs, ultimoCuadro: ahora }
+    s.bargeIn = { acople: s.bargeIn.acople, candidato: null }
+    if (!s.grabador) iniciarGrabador(s)
+    s.ultimaActividad = ahora
+    setError(null)
+    if (montadoRef.current) { setEnVivo(''); setFraseActual(-1) }
+    cambiar('escuchando')
+    setUsuarioHablando(true)
+  }, [cambiar, iniciarGrabador, proveedores])
 
   const volverAEscuchar = useCallback(() => {
     const s = sesionRef.current
     if (!s) return
+    s.ultimaActividad = Date.now()
     if (!s.micSuelto) { escucharYa(s); return }
     // Se había soltado el micrófono: se vuelve a pedir (sin nuevo permiso) y luego escucha.
     const turno = s.turno
@@ -202,29 +281,61 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     if (!vigente()) return
     if (texto.trim().length < MIN_CARACTERES_PREGUNTA) { volverAEscuchar(); return }
 
+    // Si la respuesta tarda, un acuse corto para que no se sienta muerto.
+    const acuse: { sonando: Promise<void> | null } = { sonando: null }
+    const tAcuse = setTimeout(() => {
+      if (!vigente() || faseRef.current !== 'pensando') return
+      const a = siguienteAcuse(acuseRef.current)
+      acuseRef.current = a.indice
+      acuse.sonando = voz.hablar(a.texto, ctrl.signal, { cachear: true })
+    }, Math.max(0, acuseDespuesMs - (Date.now() - s.finEnunciado)))
+
     let respuesta: string
     try {
       const promesa = cb.current.preguntar(texto, ctrl.signal) // lee el historial ANTES de agregar la pregunta
       cb.current.alPreguntar?.(texto)
       setUltimaPregunta(texto)
       setUltimaRespuesta('')
+      setFrases([])
+      setFraseActual(-1)
       respuesta = await promesa
     } catch (err) {
-      if (!vigente()) return
+      if (!vigente()) { clearTimeout(tAcuse); return }
       respuesta = err instanceof Error && err.message ? err.message : 'Hubo un error al procesar tu pregunta. Intenta de nuevo.'
     }
+    clearTimeout(tAcuse)
+    if (acuse.sonando) await acuse.sonando // no se encima con la respuesta
     if (!vigente()) return
     cb.current.alResponder?.(respuesta)
     setUltimaRespuesta(respuesta)
-    if (debeSoltarMicAlHablar()) soltarMic(s)
+    setFrases(frasesParaHablar(respuesta).map(f => f.mostrar))
+    setFraseActual(-1)
+
+    const soltar = debeSoltarMicAlHablar()
+    if (soltar) soltarMic(s)
+    s.bargeActivo = !soltar && !!voz.permiteInterrupcionPorVoz?.()
+    s.bargeIn = { acople: s.bargeIn.acople, candidato: null }
+    s.fraseDesde = Date.now()
+    setInterrumpePorVoz(s.bargeActivo)
     cambiar('hablando')
-    await voz.hablar(respuesta, ctrl.signal)
+    await voz.hablar(respuesta, ctrl.signal, {
+      alFrase: i => {
+        if (!vigente()) return
+        s.fraseDesde = Date.now()
+        setFraseActual(i)
+      },
+    })
     if (!vigente()) return
+    // Si el dueño ya había empezado a hablar justo al final, su voz ya se está grabando.
+    const c = s.bargeIn.candidato
+    if (c && s.grabador) { tomarTurno(s, c.desde, c.vozMs); return }
+    detenerGrabador(s)
     volverAEscuchar()
-  }, [cambiar, proveedores, soltarMic, volverAEscuchar])
+  }, [acuseDespuesMs, cambiar, detenerGrabador, proveedores, soltarMic, tomarTurno, volverAEscuchar])
 
   const cerrarEnunciado = useCallback((s: Sesion) => {
     const g = s.grabador
+    s.finEnunciado = Date.now()
     cambiar('pensando')
     if (!g) { volverAEscuchar(); return }
     s.grabador = null
@@ -241,10 +352,56 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     try { g.stop() } catch { volverAEscuchar() }
   }, [cambiar, procesar, volverAEscuchar])
 
+  /** Suelta todo (micrófono, grabador, lo que esté sonando). */
+  const desarmar = useCallback((s: Sesion | null) => {
+    if (!s) return
+    s.turno++
+    s.abort?.abort()
+    if (s.intervalo) clearInterval(s.intervalo)
+    detenerGrabador(s)
+    s.medidor.cerrar()
+    cerrarStream(s.stream)
+  }, [detenerGrabador])
+
+  /** 60 s sin plática: se pausa y se suelta el micrófono. Tocar "Seguir" reanuda. */
+  const pausar = useCallback(() => {
+    intentoRef.current++
+    const s = sesionRef.current
+    sesionRef.current = null
+    desarmar(s)
+    proveedores().voz.callar()
+    cambiar('pausado')
+    if (montadoRef.current) { setNivel(0); setEnVivo('') }
+  }, [cambiar, desarmar, proveedores])
+
+  /** Mientras habla: ¿el dueño está hablando encima? */
+  const cuadroHablando = useCallback((s: Sesion) => {
+    if (!s.bargeActivo || s.micSuelto) return
+    const voz = proveedores().voz
+    if (!voz.permiteInterrupcionPorVoz?.()) {
+      // La voz natural cayó al respaldo a media respuesta: ya no se puede separar el eco.
+      if (s.bargeIn.candidato) { detenerGrabador(s); s.bargeIn = { acople: s.bargeIn.acople, candidato: null } }
+      return
+    }
+    const ahora = Date.now()
+    const r = pasoBargeIn(s.bargeIn, {
+      rms: s.medidor.leer(), salida: voz.nivelSalida?.() ?? 0, ruido: ruidoDe(s.vad), ahora, fraseDesde: s.fraseDesde,
+    }, cfgBarge)
+    s.bargeIn = r.estado
+    if (r.evento === 'posible') iniciarGrabador(s) // grabar YA: no perder el inicio
+    else if (r.evento === 'descartar') detenerGrabador(s)
+    else if (r.evento === 'interrumpir') tomarTurno(s, r.inicioVoz ?? ahora, r.vozMs ?? 0)
+  }, [cfgBarge, detenerGrabador, iniciarGrabador, proveedores, tomarTurno])
+
   const cuadro = useCallback(() => {
     const s = sesionRef.current
     if (!s) return
     const f = faseRef.current
+    if (f === 'hablando') {
+      setNivel(prev => (prev === 0 ? prev : 0))
+      cuadroHablando(s)
+      return
+    }
     if (f !== 'escuchando' && f !== 'preparando') {
       setNivel(prev => (prev === 0 ? prev : 0))
       return
@@ -258,10 +415,12 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     s.vad = estado
     switch (evento) {
       case 'calibrado':
+        s.ultimaActividad = ahora
         iniciarGrabador(s)
         cambiar('escuchando')
         break
       case 'inicio':
+        s.ultimaActividad = ahora
         setUsuarioHablando(true)
         break
       case 'descartar':
@@ -280,28 +439,23 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
           cerrarEnunciado(s)
           break
         }
-        if (estado.fase === 'esperando' && f === 'escuchando' && ahora - s.grabadorDesde > REINICIO_SILENCIO_MS) {
-          iniciarGrabador(s)
+        if (estado.fase === 'esperando' && f === 'escuchando') {
+          if (ahora - s.ultimaActividad >= silencioPausaMs) { pausar(); break }
+          if (ahora - s.grabadorDesde > REINICIO_SILENCIO_MS) iniciarGrabador(s)
         }
     }
-  }, [cambiar, cerrarEnunciado, cfgVad, iniciarGrabador])
+  }, [cambiar, cerrarEnunciado, cfgVad, cuadroHablando, iniciarGrabador, pausar, silencioPausaMs])
 
   const cerrar = useCallback(() => {
     intentoRef.current++
     const s = sesionRef.current
     sesionRef.current = null
-    if (s) {
-      s.turno++
-      s.abort?.abort()
-      if (s.intervalo) clearInterval(s.intervalo)
-      detenerGrabador(s)
-      s.medidor.cerrar()
-      cerrarStream(s.stream)
-    }
+    desarmar(s)
     proveedores().voz.callar()
+    vivoRef.current?.detener()
     cambiar('inactivo')
-    if (montadoRef.current) { setNivel(0); setError(null) }
-  }, [cambiar, detenerGrabador, proveedores])
+    if (montadoRef.current) { setNivel(0); setError(null); setEnVivo('') }
+  }, [cambiar, desarmar, proveedores])
 
   /** Abre el micrófono y empieza. Llamar después de `prepararModoVozEnGesto()`. */
   const abrir = useCallback(async () => {
@@ -309,6 +463,9 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     const intento = ++intentoRef.current
     setError(null)
     cambiar('preparando')
+    // La voz natural se prepara EN PARALELO: no se espera (mientras, habla el respaldo).
+    const voz = proveedores().voz
+    void voz.cargar?.(e => { if (montadoRef.current) setCargaVoz(e) })
     const ctx = audioContextCompartido()
     let stream: MediaStream
     try {
@@ -320,22 +477,28 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
       return
     }
     if (!montadoRef.current || intento !== intentoRef.current) { cerrarStream(stream); return }
+    const ahora = Date.now()
     const s: Sesion = {
       stream,
       medidor: crearMedidor(ctx, stream),
-      vad: estadoCalibrando(Date.now()),
+      vad: estadoCalibrando(ahora),
       grabador: null,
       trozos: [],
       bytes: 0,
-      grabadorDesde: Date.now(),
+      grabadorDesde: ahora,
       micSuelto: false,
       intervalo: null,
       turno: 0,
       abort: null,
+      bargeIn: estadoInicialBargeIn(cfgBarge),
+      bargeActivo: false,
+      fraseDesde: ahora,
+      ultimaActividad: ahora,
+      finEnunciado: ahora,
     }
     sesionRef.current = s
     s.intervalo = setInterval(cuadro, CUADRO_MS)
-  }, [cambiar, cuadro])
+  }, [cambiar, cfgBarge, cuadro, proveedores])
 
   /** Tocar mientras habla o piensa: se calla / cancela y vuelve a escuchar. */
   const interrumpir = useCallback(() => {
@@ -345,11 +508,12 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     s.turno++
     s.abort?.abort()
     detenerGrabador(s)
+    s.bargeIn = { acople: s.bargeIn.acople, candidato: null }
     proveedores().voz.callar()
     volverAEscuchar()
   }, [detenerGrabador, proveedores, volverAEscuchar])
 
-  /** Tras un error: con micrófono abierto sigue escuchando; si no, lo vuelve a pedir. */
+  /** Tras un error o una pausa: con micrófono abierto sigue escuchando; si no, lo vuelve a pedir. */
   const reintentar = useCallback(() => {
     prepararModoVozEnGesto(proveedores())
     if (sesionRef.current) volverAEscuchar()
@@ -375,6 +539,7 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
         s.medidor.cerrar()
         cerrarStream(s.stream)
       }
+      vivoRef.current?.detener()
       proveedoresRef.current?.voz.callar()
     }
   }, [])
@@ -386,6 +551,11 @@ export function useModoVoz({ preguntar, alPreguntar, alResponder, proveedores: p
     error,
     ultimaPregunta,
     ultimaRespuesta,
+    frases,
+    fraseActual,
+    enVivo,
+    cargaVoz,
+    interrumpePorVoz,
     abrir,
     cerrar,
     interrumpir,

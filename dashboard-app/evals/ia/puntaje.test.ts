@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   numeroEnRespuesta, entidadEnRespuesta, dijoSinDatos, calificarRespuesta, calificarTrampa, resumir, pasaCompuerta, reporteMarkdown,
-  type ResultadoPregunta,
+  tendencia, wilson, PLANTILLA_BANCO, type ResultadoPregunta,
 } from './puntaje'
 import { MARCA_SIN_VERIFICAR, NOTA_SIN_VERIFICAR } from '@/lib/verificador-numeros'
 
@@ -132,9 +132,37 @@ describe('resumen y compuerta', () => {
     const rs = [res('s1', 'simple', 'aprobada'), res('s2', 'simple', 'fallida')]
     const md = reporteMarkdown(rs, resumir(rs), { tenant: 'chickin-demo', mes: '2026-08', ahora: '2026-09-01T12:00:00-06:00', umbral: 0.9, modelo: 'm' })
     expect(md).toMatch(/^# Eval IA del dueño — NO PASA/)
-    expect(md).toContain('**Exactitud: 50.0%** (1/2 evaluadas')
+    expect(md).toContain('**Exactitud: 50.0%** (IC 95%: 9.5%–90.5%; 1/2 evaluadas')
     expect(md).toContain('| simple | 1 | 2 | 0 |')
     expect(md).toContain('x\\|y (esperado 1, obtenido 2)')
     expect(md).toContain('se MIDE')
+  })
+})
+
+describe('intervalo de confianza (Wilson 95%) y agregados por plantilla', () => {
+  const cerca = (a: [number, number], b: [number, number]) => { expect(a[0]).toBeCloseTo(b[0], 3); expect(a[1]).toBeCloseTo(b[1], 3) }
+  it('valores conocidos; n = 0 → [0, 1]; nunca se sale de [0, 1]', () => {
+    expect(wilson(0, 0)).toEqual([0, 1])
+    cerca(wilson(50, 100), [0.4038, 0.5962])
+    cerca(wilson(10, 10), [0.7225, 1])
+    cerca(wilson(0, 10), [0, 0.2775])
+    cerca(wilson(135, 150), [0.8416, 0.9385])
+    for (const [k, n] of [[1, 1], [0, 1], [3, 7]]) { const [a, b] = wilson(k, n); expect(a).toBeGreaterThanOrEqual(0); expect(b).toBeLessThanOrEqual(1); expect(a).toBeLessThanOrEqual(k / n); expect(b).toBeGreaterThanOrEqual(k / n) }
+  })
+  it('resumen: ic95, por plantilla (banco aparte) y tendencia compacta sin datos', () => {
+    const g = (id: string, pl: string, e: ResultadoPregunta['estado']) => ({ ...res(id, 'cruce', e), plantilla: pl })
+    const rs = [res('s1', 'simple', 'aprobada'), g('g-x-a~1', 'g-x-a', 'aprobada'), g('g-x-a~2', 'g-x-a', 'fallida'), g('g-x-b~1', 'g-x-b', 'fallida'), g('g-x-b~2', 'g-x-b', 'omitida')]
+    const r = resumir(rs)
+    cerca(r.ic95, wilson(2, 4))
+    expect(r.porPlantilla).toEqual({
+      [PLANTILLA_BANCO]: { evaluadas: 1, aprobadas: 1, omitidas: 0 },
+      'g-x-a': { evaluadas: 2, aprobadas: 1, omitidas: 0 },
+      'g-x-b': { evaluadas: 1, aprobadas: 0, omitidas: 1 },
+    })
+    const md = reporteMarkdown(rs, r, { tenant: 't', mes: '2026-08', ahora: 'x', umbral: 0.9, modelo: 'm' })
+    expect(md.indexOf('| g-x-b | 0 | 1 | 0.0% |')).toBeLessThan(md.indexOf('| g-x-a | 1 | 2 | 50.0% |'))
+    const t = tendencia(r, { tenant: 't', mes: '2026-08', ahora: 'x', umbral: 0.9, modelo: 'm', semilla: '1', stamp: 's' })
+    expect(t).toMatchObject({ version: 1, evaluadas: 4, aprobadas: 2, pasa: false, porPlantilla: { 'g-x-a': { exactitud: 0.5 }, 'g-x-b': { exactitud: 0 } } })
+    expect(t.porCategoria.cruce.exactitud).toBeCloseTo(1 / 3)
   })
 })

@@ -18,7 +18,11 @@
 // y no inventa nada. `validezSql` confirma que de verdad no hay datos (n = 0); si hay, la
 // trampa no es válida para ese tenant y se omite.
 
-export type Categoria = 'simple' | 'cruce' | 'trampa' | 'fechas'
+/**
+ * Categorías del reporte. El banco escrito a mano usa simple/cruce/trampa/fechas; el
+ * generador (generador.ts) agrega ranking y comparacion.
+ */
+export type Categoria = 'simple' | 'ranking' | 'comparacion' | 'cruce' | 'trampa' | 'fechas'
 
 export interface Ctx {
   /** 'YYYY-MM' evaluado */
@@ -52,6 +56,8 @@ export interface EntidadEsperada { col: string; fila?: number; tipo?: TipoEntida
 export interface PreguntaEval {
   id: string
   categoria: Categoria
+  /** Plantilla de la que salió (sólo preguntas generadas); el reporte agrupa por ella. */
+  plantilla?: string
   pregunta: Texto
   parametrosSql?: Texto
   verdadSql?: Texto
@@ -63,6 +69,11 @@ export interface PreguntaEval {
     /** Patrones (regex, sin distinguir mayúsculas) que NO pueden aparecer en la respuesta. */
     prohibido?: string[]
   }
+  /**
+   * (Generadas) ¿La verdad es degenerada (cero, vacía, empate en un ranking)? Devuelve un
+   * motivo FIJO (sin datos del restaurante) o null. Degenerada = se omite y se reemplaza.
+   */
+  degenerada?: (filas: Record<string, unknown>[]) => string | null
 }
 
 /** Literal SQL con comillas simples escapadas. */

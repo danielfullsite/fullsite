@@ -3,7 +3,7 @@
 // de la respuesta: una instrucción de salida hablada, y sin gráfica inyectada.
 // Sin la bandera, nada cambia.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { esModoVoz, instruccionModoVoz, MODO_VOZ } from '@/lib/voz/instruccion-voz'
+import { esModoVoz, instruccionModoVoz, MAX_HISTORIAL_VOZ, MODO_VOZ } from '@/lib/voz/instruccion-voz'
 import { FIN_DATOS, INICIO_DATOS } from '@/lib/chat-context'
 
 const capturado: { messages: { role: string; content: string }[] }[] = []
@@ -64,16 +64,22 @@ describe('bandera modo', () => {
     for (const x of ['Voz', 'texto', '', null, undefined, 1, true, { modo: 'voz' }]) expect(esModoVoz(x)).toBe(false)
   })
 
-  it('la instrucción pide 2–4 oraciones, sin markdown/links/emojis, números dichos y ofrece el detalle en pantalla', () => {
+  it('la instrucción pide 1–3 oraciones con la respuesta directa primero, sin markdown/links/emojis, números con dígitos', () => {
     const i = instruccionModoVoz()
-    expect(i).toMatch(/2 a 4 oraciones/)
+    expect(i).toMatch(/1 a 3 oraciones cortas/)
+    expect(i).toMatch(/PRIMERA oración es la respuesta directa/)
+    expect(i).toMatch(/español de México natural/)
+    expect(i).toMatch(/sin forzar modismos/)
+    expect(i).toMatch(/Nunca enumeres más de 3 cosas/)
+    expect(i).toContain('¿Te los mando en pantalla?')
+    expect(i).toMatch(/pregunta breve de seguimiento SÓLO si de verdad ayuda/)
+    expect(i).toMatch(/"¿y ayer\?"/)
     expect(i).toMatch(/tablas/)
     expect(i).toMatch(/markdown/)
     expect(i).toMatch(/links/)
     expect(i).toMatch(/emojis/)
     expect(i).toMatch(/CON DÍGITOS/)
     expect(i).toMatch(/doce mil quinientos pesos/) // lo dice la app (texto-hablado), no el modelo
-    expect(i).toContain('¿Quieres el detalle en pantalla?')
     // No afloja la honestidad de datos.
     expect(i).toMatch(/si no tienes el dato/i)
   })
@@ -105,6 +111,17 @@ describe("POST /api/chat con modo 'voz'", () => {
     expect(texto.json.response).toContain('<!--chart')
     const voz = await preguntar({ message: 'hazme una grafica de ventas', modo: 'voz' })
     expect(voz.json.response).toBe('Vas bien.')
+  })
+
+  it('usa el historial de la plática (hasta MAX_HISTORIAL_VOZ mensajes) para seguimientos como "¿y ayer?"', async () => {
+    const history = Array.from({ length: 14 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `turno-${i}` }))
+    await preguntar({ message: '¿y ayer?', modo: 'voz', history })
+    const voz = capturado[capturado.length - 1].messages.filter(m => m.role !== 'system')
+    expect(MAX_HISTORIAL_VOZ).toBe(10)
+    expect(voz.map(m => m.content)).toEqual([...history.slice(-MAX_HISTORIAL_VOZ).map(h => h.content), '¿y ayer?'])
+    // El chat escrito se queda como estaba (8).
+    await preguntar({ message: '¿y ayer?', history })
+    expect(capturado[capturado.length - 1].messages.filter(m => m.role !== 'system')).toHaveLength(9)
   })
 
   it('misma guardia: sin sesión el modo voz también es 401', async () => {

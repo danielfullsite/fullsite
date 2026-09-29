@@ -1,18 +1,16 @@
 'use client'
 
 // Pantalla del modo voz ("Habla con tu restaurante"), encima del chat.
-// Estados visibles: Escuchando / Pensando / Hablando. El círculo grande interrumpe
-// mientras habla o piensa; la X termina la conversación. Lo dicho queda en el chat
-// como texto (lo agrega ChatWidget con alPreguntar / alResponder).
+// Estados visibles: Escuchando ("Te escucho…", siempre presente) / Pensando / Hablando
+// (la frase que suena, resaltada) / En pausa ("¿Seguimos?"). El círculo grande
+// interrumpe mientras habla o piensa (con voz natural también se puede interrumpir
+// hablando); la X termina la conversación. Lo dicho queda en el chat como texto
+// (lo agrega ChatWidget con alPreguntar / alResponder).
 
 import { useEffect, useRef } from 'react'
 import { AudioLines, Loader2, Mic, X } from 'lucide-react'
 import { useModoVoz, type FaseVoz } from '@/hooks/useModoVoz'
-
-/** Subtítulo de la respuesta: sin bloques de gráfica ni asteriscos (el detalle queda en el chat). */
-function subtitulo(texto: string): string {
-  return texto.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\*\*|__|`/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').trim()
-}
+import type { EstadoCargaVoz } from '@/lib/voz/proveedores'
 
 interface Props {
   preguntar: (texto: string, signal: AbortSignal) => Promise<string>
@@ -27,7 +25,18 @@ const ETIQUETA: Record<FaseVoz, string> = {
   escuchando: 'Escuchando',
   pensando: 'Pensando',
   hablando: 'Hablando',
+  pausado: '¿Seguimos?',
   error: 'En pausa',
+}
+
+/** "Preparando voz… 42% (solo la primera vez)" mientras baja el modelo; nada si no aplica. */
+export function textoCargaVoz(c: EstadoCargaVoz): string | null {
+  if (c.estado === 'descargando') {
+    const pct = c.total > 0 ? Math.min(99, Math.floor((c.cargado / c.total) * 100)) : 0
+    return `Preparando voz… ${pct}% (solo la primera vez)`
+  }
+  if (c.estado === 'iniciando') return 'Preparando voz…'
+  return null
 }
 
 export default function ModoVozPanel({ preguntar, alPreguntar, alResponder, alCerrar }: Props) {
@@ -44,16 +53,22 @@ export default function ModoVozPanel({ preguntar, alPreguntar, alResponder, alCe
 
   const terminar = () => { cerrar(); alCerrar() }
 
-  const { fase, nivel, usuarioHablando, error, ultimaPregunta, ultimaRespuesta } = voz
+  const { fase, nivel, usuarioHablando, error, ultimaPregunta, frases, fraseActual, enVivo, cargaVoz, interrumpePorVoz } = voz
   const interrumpible = fase === 'hablando' || fase === 'pensando'
   const escala = fase === 'escuchando' ? 1 + nivel * 0.35 : 1
+  const carga = textoCargaVoz(cargaVoz)
+  const pctCarga = cargaVoz.estado === 'descargando' && cargaVoz.total > 0 ? Math.min(100, (cargaVoz.cargado / cargaVoz.total) * 100) : null
 
   const pista =
-    fase === 'escuchando' ? (usuarioHablando ? 'Te escucho…' : 'Pregunta lo que quieras. Cuando hagas una pausa, te respondo.')
+    fase === 'escuchando' ? 'Te escucho…'
       : fase === 'pensando' ? 'Toca el círculo para cancelar.'
-        : fase === 'hablando' ? 'Toca el círculo para interrumpir.'
+        : fase === 'hablando' ? (interrumpePorVoz ? 'Habla o toca el círculo para interrumpir.' : 'Toca el círculo para interrumpir.')
           : fase === 'preparando' ? 'Midiendo el ruido del lugar…'
-            : ''
+            : fase === 'pausado' ? 'Pausé por silencio. Toca para seguir platicando.'
+              : ''
+
+  // Lo que dice el dueño: en vivo mientras habla; la transcripción final después.
+  const dicho = fase === 'escuchando' ? (usuarioHablando || enVivo ? enVivo : '') : ultimaPregunta
 
   return (
     <div
@@ -78,20 +93,31 @@ export default function ModoVozPanel({ preguntar, alPreguntar, alResponder, alCe
         </button>
       </div>
 
+      {carga && (
+        <div className="px-6" role="status" aria-live="polite">
+          <p className="text-xs text-white/60 text-center">{carga}</p>
+          {pctCarga !== null && (
+            <div className="mt-1 h-1 w-full max-w-xs mx-auto rounded-full bg-white/10 overflow-hidden" aria-hidden="true">
+              <div className="h-full bg-emerald-400 transition-[width] duration-300" style={{ width: `${pctCarga}%` }} />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-6 px-6 text-center">
         <button
           type="button"
-          onClick={interrumpible ? voz.interrumpir : undefined}
-          aria-disabled={!interrumpible}
-          aria-label={fase === 'hablando' ? 'Interrumpir respuesta' : fase === 'pensando' ? 'Cancelar pregunta' : ETIQUETA[fase]}
-          className={`relative w-40 h-40 sm:w-44 sm:h-44 rounded-full flex items-center justify-center focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/60 ${interrumpible ? 'cursor-pointer' : 'cursor-default'}`}
+          onClick={interrumpible ? voz.interrumpir : fase === 'pausado' ? voz.reintentar : undefined}
+          aria-disabled={!interrumpible && fase !== 'pausado'}
+          aria-label={fase === 'hablando' ? 'Interrumpir respuesta' : fase === 'pensando' ? 'Cancelar pregunta' : fase === 'pausado' ? 'Seguir conversación' : ETIQUETA[fase]}
+          className={`relative w-40 h-40 sm:w-44 sm:h-44 rounded-full flex items-center justify-center focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/60 ${interrumpible || fase === 'pausado' ? 'cursor-pointer' : 'cursor-default'}`}
         >
           <span
             aria-hidden="true"
             className={`absolute inset-0 rounded-full transition-transform duration-100 motion-reduce:transition-none motion-reduce:!transform-none ${
               fase === 'hablando' ? 'bg-gradient-to-br from-emerald-300 to-emerald-600 motion-safe:animate-pulse'
                 : fase === 'pensando' ? 'bg-gradient-to-br from-white/25 to-white/5'
-                  : fase === 'error' ? 'bg-white/10'
+                  : fase === 'error' || fase === 'pausado' ? 'bg-white/10'
                     : 'bg-gradient-to-br from-white to-neutral-300'
             }`}
             style={{ transform: `scale(${escala})` }}
@@ -100,7 +126,7 @@ export default function ModoVozPanel({ preguntar, alPreguntar, alResponder, alCe
             {fase === 'pensando' || fase === 'preparando'
               ? <Loader2 size={40} className={`motion-safe:animate-spin ${fase === 'pensando' ? 'text-white' : ''}`} />
               : fase === 'hablando' ? <AudioLines size={44} className="text-white" />
-                : fase === 'error' ? <Mic size={40} className="text-white/60" />
+                : fase === 'error' || fase === 'pausado' ? <Mic size={40} className="text-white/60" />
                   : <Mic size={40} />}
           </span>
         </button>
@@ -109,25 +135,38 @@ export default function ModoVozPanel({ preguntar, alPreguntar, alResponder, alCe
           <p className="text-lg font-semibold" aria-live="polite">{ETIQUETA[fase]}</p>
           {error
             ? <p role="alert" className="text-sm text-amber-300 max-w-xs">{error}</p>
-            : pista && <p className="text-sm text-white/60 max-w-xs">{pista}</p>}
+            : pista && <p className={`text-sm max-w-xs ${fase === 'escuchando' ? 'text-emerald-300/80 motion-safe:animate-pulse' : 'text-white/60'}`}>{pista}</p>}
         </div>
 
-        {(ultimaPregunta || ultimaRespuesta) && (
+        {(dicho || frases.length > 0) && (
           <div className="w-full max-w-sm space-y-2 text-left text-sm">
-            {ultimaPregunta && <p className="text-white/50 line-clamp-2">“{ultimaPregunta}”</p>}
-            {ultimaRespuesta && <p className="text-white/85 line-clamp-4">{subtitulo(ultimaRespuesta)}</p>}
+            {dicho && <p className="text-white/50 line-clamp-2" data-testid="voz-dicho">“{dicho}”</p>}
+            {frases.length > 0 && (
+              <p className="line-clamp-5" data-testid="voz-respuesta">
+                {frases.map((f, i) => (
+                  <span
+                    key={i}
+                    aria-current={fase === 'hablando' && i === fraseActual ? 'true' : undefined}
+                    className={fase !== 'hablando' ? 'text-white/70'
+                      : i === fraseActual ? 'text-white font-medium' : i < fraseActual ? 'text-white/60' : 'text-white/35'}
+                  >
+                    {f}{' '}
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-center gap-4 px-4">
-        {fase === 'error' && (
+        {(fase === 'error' || fase === 'pausado') && (
           <button
             type="button"
             onClick={voz.reintentar}
             className="h-12 px-5 rounded-full bg-white text-neutral-900 text-sm font-semibold hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
           >
-            Reintentar
+            {fase === 'pausado' ? 'Seguir' : 'Reintentar'}
           </button>
         )}
         <button

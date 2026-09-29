@@ -3,7 +3,7 @@
 // Se alimenta con cuadros de RMS sintéticos cada 50 ms, igual que el hook en el
 // navegador. Lo que importa en un restaurante: con ruido de fondo constante NO debe
 // "empezar a hablar", un golpe corto no es una pregunta, y una pregunta de verdad
-// se cierra ~1.2 s después de que el usuario se calla.
+// se cierra ~0.6–0.85 s después de que el usuario se calla (según cómo terminó).
 import { describe, it, expect } from 'vitest'
 import {
   estadoCalibrando, estadoInicialVad, pasoVad, ruidoDe, umbralEfectivo, VAD_POR_DEFECTO, type EstadoVad, type EventoVad,
@@ -42,12 +42,12 @@ describe('calibración', () => {
 })
 
 describe('enunciados', () => {
-  it('silencio → voz 1 s → silencio 1.2 s = inicio y fin', () => {
+  it('silencio → voz 1 s pareja → silencio = inicio y fin (a silencioFinMs)', () => {
     const { eventos } = correr([[0.005, 400], [0.2, 1000], [0.005, 1500]])
     expect(eventos.map(e => e.evento)).toEqual(['calibrado', 'inicio', 'fin'])
     const inicio = eventos.find(e => e.evento === 'inicio')!.t
     const fin = eventos.find(e => e.evento === 'fin')!.t
-    // Se cierra 1.2 s después del último cuadro con voz.
+    // Voz pareja (no se apagó): se cierra silencioFinMs después del último cuadro con voz.
     expect(fin - (inicio + 1000 - CUADRO)).toBe(VAD_POR_DEFECTO.silencioFinMs)
   })
 
@@ -119,8 +119,9 @@ describe('mínimo de 0.6 s CON voz antes de transcribir (cuota gratis de Whisper
     expect(nombres).toEqual(['calibrado', 'inicio', 'descartar'])
   })
   it('dos golpes separados (mucho lapso, poca voz) no suman un enunciado', () => {
-    // 250 ms de voz + 900 ms de silencio + 250 ms de voz: el LAPSO pasa de 600 ms, la VOZ no.
-    const { nombres } = correr([[0.005, 400], [0.3, 250], [0.005, 900], [0.3, 250], [0.005, 1500]])
+    // 250 ms de voz + 700 ms de silencio (menos que silencioFinMs, voz pareja) + 250 ms de
+    // voz: el LAPSO pasa de 600 ms, la VOZ no.
+    const { nombres } = correr([[0.005, 400], [0.3, 250], [0.005, 700], [0.3, 250], [0.005, 1500]])
     expect(nombres).toEqual(['calibrado', 'inicio', 'descartar'])
   })
   it('0.8 s de voz → enunciado', () => {

@@ -16,6 +16,7 @@ EXCLUDED=(
   "src/app/menu/[mesa]"
   "src/app/encuesta/[id]"
   "src/proxy.ts"
+  "public/voz/vendor" # motor de la voz natural (~31 MB): la app nativa no lo usa
 )
 
 STASH=".capacitor-excluded"

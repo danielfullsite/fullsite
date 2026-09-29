@@ -5,9 +5,12 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  bloquearEscrituras, configDesdeEnv, contextoEval, correrEval, escribirReportes, fijarAhora, jsonDeLog, preguntarEnProceso,
-  render, resumir, esFallaTransitoria, type ConfigEval, type Preguntar, type RespuestaChat,
+  armarLista, bloquearEscrituras, configDesdeEnv, contextoEval, correrEval, correrEvalCompleta, duracionMs, escribirReportes, fijarAhora,
+  jsonDeLog, leer429, preguntarEnProceso, render, resumir, esFallaTransitoria, vigilarGroq, MOTIVO_CUOTA,
+  type ConfigEval, type Evento429, type Preguntar, type RespuestaChat,
 } from './correr'
+import { pasaCompuerta } from './puntaje'
+import type { Reserva } from './generador'
 import { PREGUNTAS, type PreguntaEval } from './preguntas'
 import { reporteMarkdown } from './puntaje'
 import type { ResultadoConsulta } from '@/lib/ia-lectura'
@@ -303,5 +306,217 @@ describe('banco de preguntas', () => {
       expect(q.length, p.id).toBeGreaterThan(10)
     }
     expect(render(PREGUNTAS.find(p => p.id === 'c05-pct-categoria-mesero')!.pregunta, ctx)).toContain("Ana O'Brien")
+  })
+})
+
+// ── Escala: generador en la corrida, ritmo y límites de Groq ──────────────
+
+describe('configDesdeEnv (generador y ritmo)', () => {
+  it('defaults: 150 generadas, semilla = fecha real YYYYMMDD, banco incluido, 3 reintentos', () => {
+    const r = configDesdeEnv(ENV, '/x', Date.parse('2026-09-28T08:17:00Z'))
+    if (!r.ok) throw new Error('config')
+    expect(r.cfg).toMatchObject({ muestra: 150, semilla: '20260928', incluirBase: true, mesesGen: 3, reintentos: 3, maxEsperaMs: 120_000, maxMinutos: 150 })
+  })
+  it('EVAL_IA_MUESTRA / SEMILLA / INCLUIR_BASE y validaciones', () => {
+    const r = configDesdeEnv({ ...ENV, EVAL_IA_MUESTRA: '2000', EVAL_IA_SEMILLA: 'abc', EVAL_IA_INCLUIR_BASE: '0' })
+    expect(r.ok && r.cfg).toMatchObject({ muestra: 2000, semilla: 'abc', incluirBase: false })
+    expect(configDesdeEnv({ ...ENV, EVAL_IA_MUESTRA: '-1' })).toEqual({ ok: false, faltan: ['EVAL_IA_MUESTRA (entero ≥ 0)'] })
+    expect(configDesdeEnv({ ...ENV, EVAL_IA_REINTENTOS: 'x' }).ok).toBe(false)
+  })
+})
+
+describe('límites de Groq', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('duracionMs y leer429 (retry-after en segundos o fecha, "try again in", cuota diaria)', () => {
+    expect(duracionMs('1m26.4s')).toBe(86_400)
+    expect(duracionMs('520ms')).toBe(520)
+    expect(duracionMs('2h3m')).toBe(7_380_000)
+    expect(duracionMs('ya')).toBeNull()
+    expect(leer429(new Headers({ 'retry-after': '7' }), '')).toEqual({ esperaMs: 7000, diario: false })
+    expect(leer429(new Headers({ 'retry-after': new Date(1_000_000 + 5000).toUTCString() }), '', 1_000_000).esperaMs).toBeLessThanOrEqual(5000)
+    expect(leer429(new Headers(), 'Rate limit reached on tokens per minute (TPM). Please try again in 7.66s.')).toEqual({ esperaMs: 7660, diario: false })
+    expect(leer429(new Headers(), 'Rate limit reached ... on requests per day (RPD): Limit 1000, Used 1000. Please try again in 1m26.4s.').diario).toBe(true)
+    expect(leer429(new Headers({ 'x-ratelimit-remaining-requests': '0' }), '').diario).toBe(true)
+  })
+  it('vigilarGroq ve los 429 de api.groq.com (sin cambiar la respuesta) y los entrega una vez', async () => {
+    vi.stubGlobal('fetch', async (u: string) => (u.includes('groq')
+      ? new Response('{"error":{"message":"on tokens per day (TPD)"}}', { status: 429, headers: { 'retry-after': '3' } })
+      : new Response('x', { status: 429 })))
+    const v = vigilarGroq()
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST' })
+      expect(r.status).toBe(429)
+      expect(await r.text()).toContain('TPD') // el cuerpo sigue legible para lib/groq
+      await fetch('https://s.supabase.co/rest/v1/rpc/ia_consulta', { method: 'POST' })
+      expect(v.tomar()).toEqual([{ esperaMs: 3000, diario: true }])
+      expect(v.tomar()).toEqual([])
+    } finally { v.restaurar() }
+  })
+})
+
+describe('correrEvalCompleta: ritmo, 429, cuota, reemplazos y tiempo', () => {
+  const simple = (id: string, extra: Partial<PreguntaEval> = {}): PreguntaEval => ({ id, categoria: 'simple', pregunta: id, verdadSql: `V-${id}`, numeros: [{ col: 'v' }], ...extra })
+  const limitesDe = (porLlamada: Evento429[][]) => {
+    let n = -1
+    let pendientes: Evento429[] = []
+    return {
+      llamada: () => { n++; pendientes = porLlamada[n] ?? [] },
+      limites: { tomar: () => { const e = pendientes; pendientes = []; return e } },
+    }
+  }
+
+  it('429 con retry-after: espera lo pedido (+1 s) y reintenta; la respuesta con 429 no se califica', async () => {
+    const l = limitesDe([[{ esperaMs: 7000, diario: false }], []])
+    const pausas: number[] = []
+    const { resultados, corrida } = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas: [simple('a')], consultar: async () => ok([{ v: 7 }]), limites: l.limites,
+      preguntar: async () => { l.llamada(); return chat('Son 7.') }, dormir: async ms => { pausas.push(ms) },
+    })
+    expect(pausas).toEqual([8000])
+    expect(resultados[0].estado).toBe('aprobada')
+    expect(corrida).toMatchObject({ detenida: null, esperas429: 1 })
+  })
+
+  it('sin retry-after: backoff exponencial 20 s, 40 s, 80 s y luego infraestructura', async () => {
+    const l = limitesDe([[{ esperaMs: null, diario: false }], [{ esperaMs: null, diario: false }], [{ esperaMs: null, diario: false }], [{ esperaMs: null, diario: false }]])
+    const pausas: number[] = []
+    const { resultados } = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas: [simple('a')], consultar: async () => ok([{ v: 7 }]), limites: l.limites,
+      preguntar: async () => { l.llamada(); return chat('Son 7.') }, dormir: async ms => { pausas.push(ms) },
+    })
+    expect(pausas).toEqual([20_000, 40_000, 80_000])
+    expect(resultados[0]).toMatchObject({ estado: 'omitida', errorClase: 'infraestructura' })
+  })
+
+  it('cuota diaria: se detiene, reporta parcial y NO cuenta como falla (ni invalida la corrida)', async () => {
+    const l = limitesDe([[], [{ esperaMs: 86_000, diario: true }]])
+    const preguntas = [simple('a'), simple('b'), simple('c'), simple('d')]
+    let llamadas = 0
+    const { resultados, corrida } = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas, consultar: async () => ok([{ v: 7 }]), limites: l.limites, dormir: async () => {},
+      preguntar: async () => { llamadas++; l.llamada(); return chat('Son 7.') },
+    })
+    expect(llamadas).toBe(2)
+    expect(resultados.map(r => r.estado)).toEqual(['aprobada', 'omitida'])
+    expect(resultados[1].motivo).toBe(MOTIVO_CUOTA)
+    expect(corrida).toEqual({ detenida: 'cuota', noCorridas: 2, reemplazos: 0, esperas429: 0 })
+    const res = resumir(resultados, corrida)
+    expect(res.fallasInfra).toEqual(['b'])
+    expect(pasaCompuerta(res, 0.9)).toEqual({ ok: true, motivos: [] })
+    const md = reporteMarkdown(resultados, res, { tenant: 't', mes: '2026-08', ahora: 'x', umbral: 0.9, modelo: 'm' })
+    expect(md).toContain('CORRIDA PARCIAL')
+    expect(md).toContain('2 preguntas no se corrieron')
+  })
+
+  it('un retry-after mayor que la espera máxima se trata como cuota agotada', async () => {
+    const l = limitesDe([[{ esperaMs: 600_000, diario: false }]])
+    const { corrida } = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas: [simple('a'), simple('b')], consultar: async () => ok([{ v: 7 }]), limites: l.limites, dormir: async () => {},
+      preguntar: async () => { l.llamada(); return chat('Son 7.') },
+    })
+    expect(corrida.detenida).toBe('cuota')
+  })
+
+  it('generada degenerada o sin datos → se cambia por otra de la reserva (sin gastar Groq); sin reserva se queda omitida', async () => {
+    const deg = (f: Record<string, unknown>[]) => (Number(f[0].v) === 0 ? 'verdad degenerada: número en cero' : null)
+    const g1 = simple('g-s-x~1', { plantilla: 'g-s-x', degenerada: deg })
+    const g2 = simple('g-s-x~2', { plantilla: 'g-s-x', degenerada: deg })
+    const g3 = simple('g-s-x~3', { plantilla: 'g-s-x', degenerada: deg })
+    const cola = [g2, g3]
+    const reserva: Reserva = { siguiente: () => cola.shift() ?? null, restantes: () => cola.length }
+    const verdad: Record<string, ResultadoConsulta> = { 'V-g-s-x~1': ok([{ v: 0 }]), 'V-g-s-x~2': ok([]), 'V-g-s-x~3': ok([{ v: 7 }]) }
+    let llamadas = 0
+    const { resultados, corrida } = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas: [g1], reserva, consultar: async s => verdad[s], dormir: async () => {},
+      preguntar: async () => { llamadas++; return chat('Son 7.') },
+    })
+    expect(resultados).toHaveLength(1)
+    expect(resultados[0]).toMatchObject({ id: 'g-s-x~3', plantilla: 'g-s-x', estado: 'aprobada' })
+    expect(corrida.reemplazos).toBe(2)
+    expect(llamadas).toBe(1)
+    const sola = await correrEvalCompleta({ cfg: cfgBase(), preguntas: [g1], consultar: async s => verdad[s], dormir: async () => {}, preguntar: async () => chat('x') })
+    expect(sola.resultados[0]).toMatchObject({ estado: 'omitida', motivo: 'verdad degenerada: número en cero' })
+    // Una verdad con ERROR no se reemplaza: es una señal de plantilla rota.
+    const rota = await correrEvalCompleta({
+      cfg: cfgBase(), preguntas: [g1], reserva: { siguiente: () => g3, restantes: () => 1 },
+      consultar: async () => err('x'), dormir: async () => {}, preguntar: async () => chat('x'),
+    })
+    expect(rota.resultados[0]).toMatchObject({ id: 'g-s-x~1', motivo: 'la verdad falló' })
+  })
+
+  it('presupuesto de tiempo: se detiene antes de la siguiente pregunta', async () => {
+    let t = 0
+    const cfg = { ...cfgBase(), maxMinutos: 1 }
+    const { resultados, corrida } = await correrEvalCompleta({
+      cfg, preguntas: [simple('a'), simple('b'), simple('c')], consultar: async () => ok([{ v: 7 }]), dormir: async () => {},
+      reloj: () => t, preguntar: async () => { t += 45_000; return chat('Son 7.') },
+    })
+    expect(resultados.map(r => r.id)).toEqual(['a', 'b'])
+    expect(corrida).toMatchObject({ detenida: 'tiempo', noCorridas: 1 })
+  })
+})
+
+describe('armarLista', () => {
+  const consultarDescubrimiento = async (sql: string): Promise<ResultadoConsulta> => {
+    if (sql.includes("to_char(dia_venta, 'YYYY-MM')")) return ok([{ mes: '2026-08', n: 900 }])
+    if (sql.startsWith('select dia_venta')) return ok(Array.from({ length: 31 }, (_, i) => ({ dia_venta: `2026-08-${String(i + 1).padStart(2, '0')}`, n: 3 })))
+    if (sql.startsWith('select mesero')) return ok([{ mesero: 'MESERO-PRIVADO', n: 90 }, { mesero: 'Otro Mesero', n: 50 }])
+    if (sql.includes('select platillo, sum(cantidad)')) return ok([{ platillo: 'PLATILLO-PRIVADO', piezas: 50 }, { platillo: 'Otro', piezas: 9 }])
+    if (sql.includes('select categoria, sum(importe)')) return ok([{ categoria: 'BEBIDAS', ventas: 5 }, { categoria: 'COMIDA', ventas: 4 }])
+    if (sql.startsWith('select metodo_pago')) return ok([{ metodo_pago: 'Efectivo', n: 10 }, { metodo_pago: 'Tarjeta', n: 5 }])
+    return ok([])
+  }
+  const leerFranjas = async () => ({ config: { franjas: [{ key: 'd', nombre: 'Día', inicio: '07:00', fin: '15:59' }, { key: 'n', nombre: 'Noche', inicio: '16:00', fin: null }] }, esDefault: false, inicioDia: '05:00' })
+
+  it('muestra 0 = sólo el banco (sin descubrimiento); con muestra = banco + generadas intercaladas, reproducible', async () => {
+    const cfg0 = { ...cfgBase(), muestra: 0 }
+    let consultas = 0
+    const solo = await armarLista({ cfg: cfg0, consultar: async () => { consultas++; return ok([]) }, leerFranjas })
+    expect(solo.lista).toEqual(PREGUNTAS)
+    expect(solo.reserva).toBeNull()
+    expect(consultas).toBe(0)
+
+    const cfg = { ...cfgBase(), muestra: 40, semilla: 's1' }
+    const a = await armarLista({ cfg, consultar: consultarDescubrimiento, leerFranjas })
+    const b = await armarLista({ cfg, consultar: consultarDescubrimiento, leerFranjas })
+    expect(a.lista.map(p => p.id)).toEqual(b.lista.map(p => p.id))
+    expect(a.lista).toHaveLength(PREGUNTAS.length + 40)
+    expect(a.info).toMatchObject({ base: PREGUNTAS.length, muestra: 40, franjasDefault: false, dominios: { meses: 1, meseros: 2, franjas: 2 } })
+    expect(a.info.generadas).toBeGreaterThan(200)
+    // Lo que va al reporte: conteos, nunca nombres.
+    expect(JSON.stringify(a.info)).not.toMatch(/PRIVADO|Efectivo|BEBIDAS/)
+    const sinBase = await armarLista({ cfg: { ...cfg, incluirBase: false }, consultar: consultarDescubrimiento, leerFranjas })
+    expect(sinBase.lista.every(p => p.plantilla)).toBe(true)
+  })
+
+  it('EVAL_IA_SOLO filtra el banco y el pool antes de muestrear (categoría o prefijo de plantilla)', async () => {
+    const cfg = { ...cfgBase(), muestra: 10, solo: ['g-x-mesero-franja-dow'] }
+    const { lista, info } = await armarLista({ cfg, consultar: consultarDescubrimiento, leerFranjas })
+    expect(info.base).toBe(0)
+    expect(lista).toHaveLength(10)
+    expect(lista.every(p => p.plantilla === 'g-x-mesero-franja-dow')).toBe(true)
+    const trampas = await armarLista({ cfg: { ...cfgBase(), muestra: 20, solo: ['trampa'] }, consultar: consultarDescubrimiento, leerFranjas })
+    expect(trampas.lista.every(p => p.categoria === 'trampa')).toBe(true)
+  })
+
+  it('reporte de una corrida con generadas: por plantilla, IC 95% y tendencia sin datos', async () => {
+    const cfg = { ...cfgBase(), muestra: 12, semilla: 'rep', incluirBase: false, dirSalida: mkdtempSync(join(tmpdir(), 'eval-ia-')) }
+    const { lista, reserva, info } = await armarLista({ cfg, consultar: consultarDescubrimiento, leerFranjas })
+    const { resultados, corrida } = await correrEvalCompleta({
+      cfg, preguntas: lista, reserva, dormir: async () => {},
+      consultar: async s => (s.includes('count(*) as n') ? ok([{ n: 0 }]) : ok([{ ventas: 10, ordenes: 3, mesero: 'MESERO-PRIVADO', platillo: 'PLATILLO-PRIVADO', v: 1, pct: 5, piezas: 2, ticket: 3 }])),
+      preguntar: async () => chat('No tengo ese dato. MESERO-PRIVADO $10'),
+    })
+    const res = resumir(resultados, corrida)
+    const rutas = escribirReportes(cfg, resultados, res, '2026-09-28T08:17:00.000Z', info)
+    const j = JSON.parse(readFileSync(rutas.json, 'utf8'))
+    expect(j.meta).toMatchObject({ semilla: 'rep', muestra: 12 })
+    expect(Object.keys(j.resumen.porPlantilla).every((k: string) => k.startsWith('g-'))).toBe(true)
+    const t = JSON.parse(readFileSync(rutas.tendencia, 'utf8'))
+    expect(t).toMatchObject({ version: 1, semilla: 'rep', stamp: '2026-09-28T08:17:00.000Z' })
+    expect(t.ic95).toHaveLength(2)
+    const md = readFileSync(rutas.md, 'utf8')
+    expect(md).toContain('Plantillas que más fallan')
+    for (const f of [rutas.json, rutas.md, rutas.tendencia]) expect(readFileSync(f, 'utf8')).not.toMatch(/PRIVADO|Otro Mesero|¿/)
   })
 })

@@ -1,7 +1,7 @@
 // Lo que la voz del navegador lee en voz alta: sin markdown, sin links, sin emojis,
 // con los montos dichos en español, y en trozos cortos (Chrome corta a los ~15 s).
 import { describe, it, expect } from 'vitest'
-import { montoEnPalabras, numeroEnPalabras, partirParaHablar, textoParaHablar } from '@/lib/voz/texto-hablado'
+import { frasesParaHablar, montoEnPalabras, numeroEnPalabras, partirParaHablar, textoLimpioParaVoz, textoParaHablar } from '@/lib/voz/texto-hablado'
 
 describe('textoParaHablar — limpieza', () => {
   it('quita negritas, títulos, viñetas y links (los "Ver …" completos)', () => {
@@ -82,5 +82,52 @@ describe('partirParaHablar', () => {
 
   it('vacío → []', () => {
     expect(partirParaHablar('   ')).toEqual([])
+  })
+})
+
+describe('frasesParaHablar (voz natural en tubería)', () => {
+  it('una frase por oración: se MUESTRA con dígitos y se DICE en palabras', () => {
+    const f = frasesParaHablar('Hoy llevas **$12,533**. Vas 8% arriba del lunes pasado. ¿Quieres verlo por mesero?')
+    expect(f.map(x => x.mostrar)).toEqual(['Hoy llevas $12,533.', 'Vas 8% arriba del lunes pasado.', '¿Quieres verlo por mesero?'])
+    expect(f[0].hablar).toBe('Hoy llevas doce mil quinientos treinta y tres pesos.')
+    expect(f[1].hablar).toBe('Vas ocho por ciento arriba del lunes pasado.')
+  })
+
+  it('el punto decimal NO parte la frase', () => {
+    const f = frasesParaHablar('El ticket promedio es $245.50 hoy. Subió.')
+    expect(f.map(x => x.mostrar)).toEqual(['El ticket promedio es $245.50 hoy.', 'Subió.'])
+    expect(f[0].hablar).toContain('doscientos cuarenta y cinco pesos con cincuenta centavos')
+  })
+
+  it('la primera frase se mantiene corta (es la que el dueño espera en silencio)', () => {
+    const larga = 'Hoy vas muy bien comparado con el mismo día de la semana pasada, sobre todo en la mañana, y el ticket promedio también subió bastante. Fin.'
+    const f = frasesParaHablar(larga)
+    expect(f[0].mostrar.length).toBeLessThanOrEqual(90)
+    expect(f[0].mostrar.endsWith(',')).toBe(true)
+    expect(f.map(x => x.mostrar).join(' ')).toBe(textoLimpioParaVoz(larga))
+  })
+
+  it('trozos muy cortos ("Va.") se juntan con el siguiente para no dejar huecos', () => {
+    expect(frasesParaHablar('Va. Hoy llevas $5,000 en ventas.').map(x => x.mostrar)).toEqual(['Va. Hoy llevas $5,000 en ventas.'])
+  })
+
+  it('oraciones larguísimas se parten (≤ 200 caracteres) y nada se pierde', () => {
+    const md = `Detalle: ${'mesa uno, '.repeat(40)}fin.`
+    const f = frasesParaHablar(md)
+    expect(f.length).toBeGreaterThan(1)
+    for (const x of f) expect(x.mostrar.length).toBeLessThanOrEqual(200)
+    expect(f.map(x => x.mostrar).join(' ')).toBe(textoLimpioParaVoz(md))
+  })
+
+  it('markdown, links, gráficas y emojis fuera; vacío → []', () => {
+    const f = frasesParaHablar('**Hola** 🚀 [Ver ventas →](/ventas)\n<!--chart\n{}\nchart-->')
+    expect(f.map(x => x.mostrar)).toEqual(['Hola.'])
+    expect(frasesParaHablar('')).toEqual([])
+  })
+
+  it('textoParaHablar = textoLimpioParaVoz + números dichos', () => {
+    const md = 'Hoy: **$1,200** (12%).'
+    expect(textoParaHablar(md)).toBe('Hoy: mil doscientos pesos (doce por ciento).')
+    expect(textoLimpioParaVoz(md)).toBe('Hoy: $1,200 (12%).')
   })
 })

@@ -13,6 +13,12 @@
 // terminaba. Al abrir se calibra (~300 ms: promedio del RMS) y, mientras nadie
 // habla, el piso de ruido se sigue ajustando (EMA). El umbral efectivo es el mayor
 // entre el mínimo configurado y `factorRuido × piso`.
+//
+// Fin de turno ADAPTATIVO (antes 1.2 s fijos; se sentía lento, "de nota de voz"):
+// si la voz se fue APAGANDO (el nivel de las últimas sílabas quedó por debajo de
+// `caidaRelativa × pico`, como al terminar una pregunta), se cierra con
+// `silencioFinCortoMs`; si se cortó con energía alta (una pausa para pensar a media
+// frase), se espera `silencioFinMs`.
 
 export interface ConfigVad {
   /** RMS mínimo para considerar que hay voz (0‥1). */
@@ -21,8 +27,12 @@ export interface ConfigVad {
   factorRuido: number
   /** Medición inicial del ruido del lugar. */
   calibracionMs: number
-  /** Silencio continuo que cierra el enunciado. */
+  /** Silencio continuo que cierra el enunciado (voz que se cortó con energía alta). */
   silencioFinMs: number
+  /** Silencio que cierra cuando la voz terminó APAGÁNDOSE (fin natural de frase). */
+  silencioFinCortoMs: number
+  /** "Se fue apagando" = nivel final < pico × esto. */
+  caidaRelativa: number
   /**
    * Enunciados con menos VOZ que esto (suma de cuadros POR ENCIMA del umbral, no el
    * lapso de inicio a fin) se descartan sin transcribir: cada nota gasta cuota gratis
@@ -39,7 +49,9 @@ export const VAD_POR_DEFECTO: ConfigVad = {
   umbralMin: 0.02,
   factorRuido: 2.5,
   calibracionMs: 300,
-  silencioFinMs: 1200,
+  silencioFinMs: 850,
+  silencioFinCortoMs: 600,
+  caidaRelativa: 0.45,
   minVozMs: 600,
   maxVozMs: 45_000,
   alfaRuido: 0.05,
@@ -48,7 +60,11 @@ export const VAD_POR_DEFECTO: ConfigVad = {
 export type EstadoVad =
   | { fase: 'calibrando'; desde: number; suma: number; cuadros: number }
   | { fase: 'esperando'; ruido: number }
-  | { fase: 'hablando'; ruido: number; inicio: number; ultimaVoz: number; vozMs?: number; ultimoCuadro?: number }
+  | {
+    fase: 'hablando'; ruido: number; inicio: number; ultimaVoz: number; vozMs?: number; ultimoCuadro?: number
+    /** Nivel máximo del enunciado y promedio móvil de las últimas sílabas con voz. */
+    pico?: number; nivelFinal?: number
+  }
 
 export type EventoVad = 'calibrado' | 'inicio' | 'fin' | 'descartar' | null
 
@@ -70,6 +86,14 @@ export function umbralEfectivo(ruido: number, cfg: ConfigVad = VAD_POR_DEFECTO):
 export function ruidoDe(estado: EstadoVad): number {
   if (estado.fase === 'calibrando') return estado.cuadros ? estado.suma / estado.cuadros : 0
   return estado.ruido
+}
+
+/** Silencio que cierra ESTE enunciado: corto si la voz se fue apagando. */
+export function silencioParaCerrar(estado: EstadoVad, cfg: ConfigVad = VAD_POR_DEFECTO): number {
+  if (estado.fase !== 'hablando') return cfg.silencioFinMs
+  const { pico, nivelFinal } = estado
+  if (pico && nivelFinal !== undefined && nivelFinal < pico * cfg.caidaRelativa) return Math.min(cfg.silencioFinCortoMs, cfg.silencioFinMs)
+  return cfg.silencioFinMs
 }
 
 export function pasoVad(
@@ -94,7 +118,7 @@ export function pasoVad(
 
   if (estado.fase === 'esperando') {
     if (hayVoz) {
-      return { estado: { fase: 'hablando', ruido: estado.ruido, inicio: ahora, ultimaVoz: ahora, vozMs: 0, ultimoCuadro: ahora }, evento: 'inicio' }
+      return { estado: { fase: 'hablando', ruido: estado.ruido, inicio: ahora, ultimaVoz: ahora, vozMs: 0, ultimoCuadro: ahora, pico: nivel, nivelFinal: nivel }, evento: 'inicio' }
     }
     // Sólo se aprende el ruido mientras nadie habla.
     const ruido = estado.ruido + cfg.alfaRuido * (nivel - estado.ruido)
@@ -109,8 +133,11 @@ export function pasoVad(
   if (ahora - estado.inicio >= cfg.maxVozMs) {
     return { estado: estadoInicialVad(estado.ruido), evento: 'fin' }
   }
-  if (ahora - ultimaVoz >= cfg.silencioFinMs) {
+  const pico = hayVoz ? Math.max(estado.pico ?? 0, nivel) : estado.pico
+  const nivelFinal = hayVoz ? (estado.nivelFinal === undefined ? nivel : estado.nivelFinal + 0.3 * (nivel - estado.nivelFinal)) : estado.nivelFinal
+  const siguiente = { ...estado, ultimaVoz, vozMs, ultimoCuadro: ahora, pico, nivelFinal }
+  if (ahora - ultimaVoz >= silencioParaCerrar(siguiente, cfg)) {
     return { estado: estadoInicialVad(estado.ruido), evento: vozMs >= cfg.minVozMs ? 'fin' : 'descartar' }
   }
-  return { estado: { ...estado, ultimaVoz, vozMs, ultimoCuadro: ahora }, evento: null }
+  return { estado: siguiente, evento: null }
 }

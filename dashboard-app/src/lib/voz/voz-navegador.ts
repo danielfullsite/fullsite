@@ -1,14 +1,17 @@
-// Voz de salida GRATIS: `speechSynthesis` del navegador.
+// Voz de RESPALDO: `speechSynthesis` del navegador. La voz principal es Piper
+// (./voz-natural); ésta se usa mientras la voz natural se descarga, o si no se puede
+// (sin WebAssembly, poca memoria, descarga fallida, síntesis lenta).
 //
-// - Elige la mejor voz en español disponible (ver ./voces).
+// - Elige la mejor voz en español disponible (ver ./voces: Premium/Google primero).
 // - Limpia markdown/links/emojis y verbaliza montos antes de hablar (./texto-hablado).
-// - Habla por trozos de una oración: Chrome corta en silencio los enunciados de más
-//   de ~15 s y así también se puede interrumpir en cualquier momento.
+// - Habla frase por frase (`frasesParaHablar`, las mismas que resalta la pantalla):
+//   Chrome corta en silencio los enunciados de más de ~15 s y así también se puede
+//   interrumpir en cualquier momento.
 // - iOS Safari sólo deja hablar si la PRIMERA síntesis nació de un toque del usuario:
 //   `preparar()` dice un enunciado vacío y se llama dentro del onClick del botón.
 
 import type { ProveedorVoz } from './proveedores'
-import { partirParaHablar, textoParaHablar } from './texto-hablado'
+import { frasesParaHablar } from './texto-hablado'
 import { elegirVoz } from './voces'
 
 function sintesis(): SpeechSynthesis | null {
@@ -16,6 +19,8 @@ function sintesis(): SpeechSynthesis | null {
   if (typeof SpeechSynthesisUtterance === 'undefined') return null
   return window.speechSynthesis
 }
+
+export const VELOCIDAD_NAVEGADOR = 1.05
 
 let vozCache: SpeechSynthesisVoice | null = null
 let escuchandoCambios = false
@@ -38,7 +43,9 @@ function hablarTrozo(s: SpeechSynthesis, texto: string, voz: SpeechSynthesisVoic
     if (signal?.aborted) { resolve(); return }
     const u = new SpeechSynthesisUtterance(texto)
     if (voz) { u.voice = voz; u.lang = voz.lang } else { u.lang = 'es-MX' }
-    u.rate = 1
+    // Un poco más ágil que el default: a 1.0 las voces del sistema suenan lentas y
+    // "leídas". El tono se queda en 1 (subirlo suena caricaturesco).
+    u.rate = VELOCIDAD_NAVEGADOR
     u.pitch = 1
 
     let listo = false
@@ -81,16 +88,17 @@ export function crearVozNavegador(): ProveedorVoz {
         s.speak(u)
       } catch { /* sin voz: el texto sigue en pantalla */ }
     },
-    async hablar(texto, signal) {
+    async hablar(texto, signal, opciones) {
       const s = sintesis()
       if (!s) return
-      const trozos = partirParaHablar(textoParaHablar(texto, { anioActual: new Date().getFullYear() }))
+      const frases = frasesParaHablar(texto, { anioActual: new Date().getFullYear() })
       const mio = ++turno
       try { s.cancel() } catch { /* */ }
       const voz = vozElegida(s)
-      for (const t of trozos) {
+      for (let i = Math.max(0, opciones?.desdeFrase ?? 0); i < frases.length; i++) {
         if (mio !== turno || signal?.aborted) return
-        await hablarTrozo(s, t, voz, signal)
+        opciones?.alFrase?.(i)
+        await hablarTrozo(s, frases[i].hablar, voz, signal)
       }
     },
     callar() {

@@ -129,13 +129,13 @@ export function verbalizarNumeros(texto: string, anioActual?: number): string {
 const RE_EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu
 
 /**
- * Texto de la respuesta → texto para hablar.
+ * Respuesta (markdown ligero) → texto limpio, SIN verbalizar números: lo que se
+ * MUESTRA como subtítulo mientras se habla. Cada línea termina en puntuación.
  *  - quita bloques de gráfica y comentarios HTML
  *  - [etiqueta](/ruta) → etiqueta (sin "Ver detalle →" colgando)
  *  - quita **, __, `, #, >, viñetas, tablas y emojis
- *  - verbaliza montos, porcentajes y fechas
  */
-export function textoParaHablar(md: string, opciones: { anioActual?: number } = {}): string {
+export function textoLimpioParaVoz(md: string): string {
   if (!md) return ''
   let t = md
     .replace(/<!--\s*chart[\s\S]*?chart\s*-->/g, ' ')
@@ -169,8 +169,6 @@ export function textoParaHablar(md: string, opciones: { anioActual?: number } = 
     .replace(/[→←↑↓⇒➜▶►]/g, ' ')
     .replace(RE_EMOJI, '')
 
-  t = verbalizarNumeros(t, opciones.anioActual)
-
   // Saltos de línea → pausa: cada línea termina en puntuación.
   return t
     .split('\n')
@@ -181,6 +179,95 @@ export function textoParaHablar(md: string, opciones: { anioActual?: number } = 
     .replace(/\s+([.,;:!?])/g, '$1')
     .replace(/([.,;:!?])\1+/g, '$1')
     .trim()
+}
+
+/**
+ * Texto de la respuesta → texto para hablar: `textoLimpioParaVoz` + montos,
+ * porcentajes y fechas dichos en palabras.
+ */
+export function textoParaHablar(md: string, opciones: { anioActual?: number } = {}): string {
+  return verbalizarNumeros(textoLimpioParaVoz(md), opciones.anioActual).trim()
+}
+
+/** Una frase de la respuesta: lo que se muestra (con dígitos) y lo que se dice. */
+export interface FraseHablada {
+  mostrar: string
+  hablar: string
+}
+
+/**
+ * Parte una oración larga por comas / punto y coma y, si aún no cabe, por palabras.
+ */
+function partirOracionLarga(oracion: string, max: number): string[] {
+  if (oracion.length <= max) return [oracion]
+  const piezas: string[] = []
+  for (const frase of oracion.split(/(?<=[,;:])\s+/)) {
+    if (frase.length <= max) { piezas.push(frase); continue }
+    let actual = ''
+    for (const palabra of frase.split(' ')) {
+      if (actual && (actual.length + 1 + palabra.length) > max) { piezas.push(actual); actual = palabra }
+      else actual = actual ? `${actual} ${palabra}` : palabra
+    }
+    if (actual) piezas.push(actual)
+  }
+  return piezas
+}
+
+/**
+ * Respuesta → frases para hablar UNA POR UNA (voz natural en tubería: mientras
+ * suena la frase 1 se sintetiza la 2).
+ *
+ * - Se parte por oración: puntuación final SEGUIDA de espacio, así "$12,500.50" no
+ *   se parte en el punto decimal.
+ * - La PRIMERA frase se mantiene corta (`primeraMax`): es la que el dueño espera en
+ *   silencio; si es larga se corta en la primera coma después de ~25 caracteres.
+ * - Oraciones de más de `maxCaracteres` se parten por comas y luego por palabras.
+ * - Trozos muy cortos (< 12 caracteres, "Va.") se juntan con el siguiente: un trozo suelto de medio
+ *   segundo deja un hueco mientras se sintetiza el que sigue.
+ *
+ * `mostrar` conserva los dígitos (subtítulo); `hablar` los dice en palabras. El
+ * cliente y el proveedor de voz llaman a esta función con el mismo texto, así el
+ * índice de frase que reporta la voz es el mismo que resalta la pantalla.
+ */
+export function frasesParaHablar(
+  md: string,
+  opciones: { anioActual?: number; maxCaracteres?: number; primeraMax?: number; minCaracteres?: number } = {},
+): FraseHablada[] {
+  const limpio = textoLimpioParaVoz(md)
+  if (!limpio) return []
+  const max = Math.max(40, opciones.maxCaracteres ?? 200)
+  const primeraMax = Math.max(30, opciones.primeraMax ?? 90)
+  const min = Math.max(0, opciones.minCaracteres ?? 12)
+
+  const oraciones = limpio.split(/(?<=[.!?…])\s+/).map(o => o.trim()).filter(Boolean)
+  let piezas: string[] = []
+  for (const o of oraciones) piezas.push(...partirOracionLarga(o, max))
+
+  // Juntar trozos muy cortos con el siguiente.
+  const juntas: string[] = []
+  for (const p of piezas) {
+    const ultimo = juntas[juntas.length - 1]
+    if (ultimo !== undefined && ultimo.length < min && ultimo.length + 1 + p.length <= max) juntas[juntas.length - 1] = `${ultimo} ${p}`
+    else juntas.push(p)
+  }
+  piezas = juntas
+
+  // Primera frase corta: se corta en una coma después de ~25 caracteres.
+  if (piezas.length && piezas[0].length > primeraMax) {
+    const primera = piezas[0]
+    const re = /,\s+/g
+    let m: RegExpExecArray | null
+    let corte = -1
+    while ((m = re.exec(primera))) {
+      if (m.index >= 25 && m.index <= primeraMax) { corte = m.index + 1; break }
+    }
+    if (corte > 0) piezas.splice(0, 1, primera.slice(0, corte).trim(), primera.slice(corte).trim())
+  }
+
+  return piezas.filter(Boolean).map(mostrar => ({
+    mostrar,
+    hablar: verbalizarNumeros(mostrar, opciones.anioActual).replace(/\s+/g, ' ').trim(),
+  }))
 }
 
 /**

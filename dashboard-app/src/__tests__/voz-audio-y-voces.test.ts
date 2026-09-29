@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   elegirMimeType, extensionDeMime, formatoDuracion, mensajeErrorMicrofono, nivelVisual, rmsDeBytes,
 } from '@/lib/voz/audio'
-import { elegirVoz, puntajeCalidad, rangoRegion, type VozDisponible } from '@/lib/voz/voces'
+import { elegirVoz, nivelPreferencia, puntajeCalidad, rangoRegion, type VozDisponible } from '@/lib/voz/voces'
 import { nombreProveedor, PROVEEDOR_POR_DEFECTO } from '@/lib/voz/proveedores'
 
 describe('elegirMimeType', () => {
@@ -74,9 +74,42 @@ describe('mensajeErrorMicrofono', () => {
 describe('elegirVoz', () => {
   const v = (name: string, lang: string, localService = true): VozDisponible => ({ name, lang, localService })
 
-  it('prefiere es-MX sobre es-US, es-ES y otros', () => {
-    const voces = [v('Monica', 'es-ES'), v('Paulina', 'es-MX'), v('Google español de Estados Unidos', 'es-US', false), v('Samantha', 'en-US')]
-    expect(elegirVoz(voces)?.name).toBe('Paulina')
+  it('Mac + Chrome (queja real "suena robótica"): Google español de Estados Unidos le gana a Paulina compacta', () => {
+    const voces = [v('Monica', 'es-ES'), v('Paulina', 'es-MX'), v('Google español de Estados Unidos', 'es-US', false), v('Google español', 'es-ES', false), v('Samantha', 'en-US')]
+    expect(elegirVoz(voces)?.name).toBe('Google español de Estados Unidos')
+  })
+
+  it('Paulina Premium/Mejorada (es-MX) le gana incluso a Google', () => {
+    const voces = [v('Google español de Estados Unidos', 'es-US', false), v('Paulina (Premium)', 'es-MX'), v('Paulina', 'es-MX')]
+    expect(elegirVoz(voces)?.name).toBe('Paulina (Premium)')
+    const porUri = [{ ...v('Paulina', 'es-MX'), voiceURI: 'com.apple.voice.premium.es-MX.Paulina' }, v('Google español de Estados Unidos', 'es-US', false)]
+    expect(elegirVoz(porUri)?.voiceURI).toContain('premium')
+  })
+
+  it('orden completo: Premium es-MX > Google latino > Premium latino > Google es-ES > es-MX normal > es-US > es-ES', () => {
+    const orden = [
+      v('Paulina (Enhanced)', 'es-MX'),
+      v('Google español de Estados Unidos', 'es-US', false),
+      v('Microsoft Sabina Online (Natural)', 'es-US', false),
+      v('Google español', 'es-ES', false),
+      v('Paulina', 'es-MX'),
+      v('Juan', 'es-US'),
+      v('Monica', 'es-ES'),
+    ]
+    const niveles = orden.map(nivelPreferencia)
+    expect([...niveles].sort((a, b) => b - a)).toEqual(niveles)
+    expect(new Set(niveles).size).toBe(niveles.length)
+    for (let i = 0; i < orden.length; i++) expect(elegirVoz(orden.slice(i).reverse())?.name).toBe(orden[i].name)
+  })
+
+  it('una voz compacta (voiceURI) queda debajo de la normal de la misma región', () => {
+    const compacta = { ...v('Paulina', 'es-MX'), voiceURI: 'com.apple.voice.compact.es-MX.Paulina' }
+    const normal = { ...v('Juan', 'es-MX'), voiceURI: 'Juan' }
+    expect(elegirVoz([compacta, normal])?.name).toBe('Juan')
+  })
+
+  it('sin Google ni Premium: es-MX sigue ganando', () => {
+    expect(elegirVoz([v('Monica', 'es-ES'), v('Paulina', 'es-MX'), v('Juan', 'es-US')])?.name).toBe('Paulina')
   })
 
   it('sin es-MX: es-US, luego es-ES, luego cualquier es-*', () => {

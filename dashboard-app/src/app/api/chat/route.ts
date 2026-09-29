@@ -16,7 +16,7 @@ import {
 } from '@/lib/chat-context'
 import { contextoDia, type ContextoDia } from '@/lib/agents/dia-negocio'
 import { desdeEventos, type EventoAgente } from '@/lib/atencion'
-import { esModoVoz, instruccionModoVoz } from '@/lib/voz/instruccion-voz'
+import { esModoVoz, instruccionModoVoz, MAX_HISTORIAL_VOZ } from '@/lib/voz/instruccion-voz'
 import {
   aplicarGraficas, anexarGrafica, claveConsulta, compactarGraficasEnHistorial, construirCatalogo, elegirGraficaPorPregunta,
   graficaDeConsulta, lineasCatalogoParaPrompt, MAX_GRAFICAS_POR_RESPUESTA, type FuenteVentasChat,
@@ -1344,7 +1344,8 @@ ${envolverDatos(bloqueDatos)}`
       // en el cuerpo de la petición es un intento de reescribir las reglas.
       // Las gráficas del historial vuelven compactadas a su marcador (el JSON gastaba
       // el tope de caracteres y enseñaba al modelo a copiar datos).
-      ...historialSeguro(compactarGraficasEnHistorial(history), 8),
+      // Voz: plática continua ("¿y ayer?"), un poco más de historial que el chat escrito.
+      ...historialSeguro(compactarGraficasEnHistorial(history), enVoz ? MAX_HISTORIAL_VOZ : 8),
       { role: 'user', content: message.slice(0, 4000) },
     ]
 

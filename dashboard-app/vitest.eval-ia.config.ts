@@ -9,7 +9,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['evals/ia/**/*.eval.ts'],
-    testTimeout: 90 * 60_000,
+    testTimeout: 180 * 60_000,
     // Una sola pregunta a la vez: el tope gratuito de Groq es por minuto.
     fileParallelism: false,
   },
