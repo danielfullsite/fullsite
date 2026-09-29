@@ -150,12 +150,15 @@ export async function contextoFrescura(rpc: Rpc, clientId: string, tz: string, h
  *   el POS nunca vendió; `undefined` = no se sabe. Sirve para distinguir "no se vendió
  *   ese producto" de "el POS no tiene cobertura en esas fechas".
  */
-export async function contextoProducto(rpc: Rpc, clientId: string, mensaje: string, desde: string, hasta: string, tz: string, ultimaVentaPos?: string | null): Promise<string> {
+export async function contextoProducto(rpc: Rpc, clientId: string, mensaje: string, desde: string, hasta: string, tz: string, ultimaVentaPos?: string | null,
+  /** Opcional: recibe las filas del TOP del periodo (sin búsqueda) para la gráfica del chat. */
+  salida?: { topFilas?: Record<string, unknown>[] }): Promise<string> {
   const terms = terminosBusqueda(mensaje)
   const filas = terms.length
     ? await buscar(rpc, 'fs_ventas_producto', { p_client_id: clientId, p_desde: desde, p_hasta: hasta, p_tz: tz }, terms)
     : await rpc('fs_ventas_producto', { p_client_id: clientId, p_desde: desde, p_hasta: hasta, p_busqueda: '', p_tz: tz })
   if (!filas) return ''
+  if (salida && terms.length === 0) salida.topFilas = filas
   const titulo = terms.length ? `búsqueda "${terms.join(' ')}"` : 'top del periodo'
   if (filas.length === 0) {
     const cab = `\nVENTAS POR PRODUCTO (POS Fullsite, ${desde} a ${hasta}, ${titulo}): 0 ventas registradas`

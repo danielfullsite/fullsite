@@ -1,11 +1,17 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, ArrowLeft, Sparkles } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
+import { MessageCircle, X, ArrowLeft, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
 import { hrefInternoSeguro } from '@/lib/chat-context'
+import { consultarChat, MENSAJE_ERROR_CHAT } from '@/lib/chat-cliente'
+import { MODO_VOZ } from '@/lib/voz/instruccion-voz'
+import ComposerChat from '@/components/chat/ComposerChat'
+import ModoVozPanel from '@/components/chat/ModoVozPanel'
+import GraficaChat from '@/components/chat/GraficaChat'
+import { corteSinPartirBloques, separarGraficas } from '@/lib/grafica-spec'
 
 const quickQuestions = [
   '¿Cómo van las ventas hoy?',
@@ -15,112 +21,6 @@ const quickQuestions = [
   '¿Cuál es mi platillo más vendido?',
   '¿Cómo vamos vs la semana pasada?',
 ]
-
-// Parse chart data from <!--chart ... chart--> markers
-interface ChartData { type: 'bar' | 'line' | 'pie'; title: string; data: { label: string; value: number }[] }
-
-function extractChart(text: string): { clean: string; chart: ChartData | null } {
-  // Strip ALL chart blocks and parse the first valid one
-  let chart: ChartData | null = null
-  let clean = text
-  const regex = /<!--\s*chart\s*([\s\S]*?)\s*chart\s*-->/g
-  let match
-  while ((match = regex.exec(text)) !== null) {
-    if (!chart) {
-      try { chart = JSON.parse(match[1].trim()) as ChartData } catch { /* skip invalid */ }
-    }
-    clean = clean.replace(match[0], '')
-  }
-  return { clean: clean.trim(), chart }
-}
-
-function MiniChart({ chart }: { chart: ChartData }) {
-  const max = Math.max(...chart.data.map(d => d.value), 1)
-  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
-
-  // Bar or Line chart — hook must be called before any early return (Rules of Hooks)
-  const [expanded, setExpanded] = useState(false)
-
-  if (chart.type === 'pie') {
-    const total = chart.data.reduce((s, d) => s + d.value, 0)
-    let angle = 0
-    return (
-      <div className="mt-2 p-3 bg-black/20 rounded-xl">
-        <p className="text-xs font-semibold text-[var(--text-2)] mb-2">{chart.title}</p>
-        <div className="flex items-center gap-3">
-          <svg viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
-            {chart.data.map((d, i) => {
-              const pct = d.value / total
-              const start = angle
-              angle += pct * 360
-              const r = 45, cx = 50, cy = 50
-              const startRad = (start - 90) * Math.PI / 180
-              const endRad = (start + pct * 360 - 90) * Math.PI / 180
-              const large = pct > 0.5 ? 1 : 0
-              const path = `M${cx},${cy} L${cx + r * Math.cos(startRad)},${cy + r * Math.sin(startRad)} A${r},${r} 0 ${large} 1 ${cx + r * Math.cos(endRad)},${cy + r * Math.sin(endRad)} Z`
-              return <path key={i} d={path} fill={colors[i % colors.length]} />
-            })}
-          </svg>
-          <div className="space-y-1">
-            {chart.data.map((d, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colors[i % colors.length] }} />
-                <span className="text-[var(--text-3)]">{d.label}</span>
-                <span className="text-white font-medium">${d.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-  const displayData = chart.data.length > 14 && !expanded ? chart.data.slice(-14) : chart.data
-
-  const renderBars = (h: number, maxW: number, labelSize: string, valueSize: string, gap: string) => (
-    <div className={`flex items-end ${gap} overflow-hidden`} style={{ height: h }}>
-      {displayData.map((d, i) => (
-        <div key={i} className="flex flex-col items-center gap-px flex-1 min-w-0">
-          <span className={`${valueSize} text-emerald-400 font-medium truncate w-full text-center`}>
-            {d.value >= 10000 ? `$${(d.value / 1000).toFixed(0)}k` : `$${Math.round(d.value).toLocaleString()}`}
-          </span>
-          <div
-            className="rounded-t w-full mx-auto"
-            style={{ maxWidth: maxW, height: `${Math.max(3, (d.value / max) * (h * 0.75))}px`, background: colors[i % colors.length] }}
-          />
-          <span className={`${labelSize} text-[var(--text-3)] truncate w-full text-center`}>{d.label}</span>
-        </div>
-      ))}
-    </div>
-  )
-
-  return (
-    <>
-      <div className="mt-2 p-2 bg-black/20 rounded-xl overflow-hidden cursor-pointer hover:bg-black/30 transition-colors" onClick={() => setExpanded(true)}>
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[10px] font-semibold text-[var(--text-2)]">{chart.title}</p>
-          <span className="text-[8px] text-[var(--text-3)]">Click para expandir</span>
-        </div>
-        {renderBars(80, 20, 'text-[6px]', 'text-[7px]', 'gap-px')}
-      </div>
-      {expanded && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setExpanded(false)}>
-          <div className="bg-[var(--surface-2)] border border-[var(--line)] rounded-2xl w-full max-w-4xl max-h-[80vh] p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">{chart.title}</h3>
-              <button onClick={() => setExpanded(false)} className="w-10 h-10 rounded-lg bg-[var(--line)] flex items-center justify-center text-white hover:bg-[var(--line-soft)]">✕</button>
-            </div>
-            {renderBars(300, 40, 'text-xs', 'text-sm', 'gap-1')}
-            <div className="flex items-center justify-between mt-4 text-sm text-[var(--text-3)]">
-              <span>{displayData.length} datos</span>
-              <span>Total: ${displayData.reduce((s, d) => s + d.value, 0).toLocaleString()}</span>
-              <span>Promedio: ${Math.round(displayData.reduce((s, d) => s + d.value, 0) / displayData.length).toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
 
 // Renderiza markdown básico: **negritas** y [links](url)
 function renderMarkdown(text: string) {
@@ -152,14 +52,44 @@ function renderMarkdown(text: string) {
   })
 }
 
+/**
+ * Contenido de una respuesta: texto + gráficas del servidor. Memo por texto: los
+ * mensajes que no cambian no se re-parsean ni re-dibujan en cada tick (15 ms) de la
+ * máquina de escribir; y `separarGraficas` devuelve el MISMO spec para el mismo bloque,
+ * así la gráfica memoizada del mensaje que se está escribiendo tampoco se re-dibuja.
+ */
+const ContenidoAsistente = memo(function ContenidoAsistente({ texto }: { texto: string }) {
+  // Sólo se dibujan gráficas que armó el servidor (spec v2 válido); un bloque viejo
+  // escrito por el modelo se descarta.
+  const partes = useMemo(() => separarGraficas(texto), [texto])
+  return (
+    <>
+      {partes.map((parte, j) => parte.tipo === 'texto'
+        ? <div key={j} className="whitespace-pre-wrap">{renderMarkdown(parte.texto)}</div>
+        : <GraficaChat key={`${j}-${parte.spec.id}`} spec={parte.spec} />)}
+    </>
+  )
+})
+
+type MensajeChat = ChatMessage & { timestamp?: Date; id?: number }
+let siguienteIdMensaje = 1
+
 export default function ChatWidget() {
   const { clientId } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<(ChatMessage & { timestamp?: Date })[]>([])
+  const [messages, setMessages] = useState<MensajeChat[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  // Modo voz "Habla con tu restaurante": panel encima del chat, mismo historial.
+  const [modoVoz, setModoVoz] = useState(false)
+  const messagesRef = useRef(messages)
+  useEffect(() => { messagesRef.current = messages }, [messages])
   // Typewriter state: the partial text being animated in for the latest assistant message
   const [typingContent, setTypingContent] = useState<string | null>(null)
+  // Id del mensaje que se está escribiendo: el texto final va a ESE mensaje, no al
+  // "último" (el modo voz puede agregar mensajes mientras tanto).
+  const [typingId, setTypingId] = useState<number | null>(null)
+  const typingIdRef = useRef<number | null>(null)
   const typingFullRef = useRef<string>('')      // full target text
   const typingIndexRef = useRef(0)              // chars revealed so far
   const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -173,16 +103,11 @@ export default function ChatWidget() {
       clearInterval(typingTimerRef.current)
       typingTimerRef.current = null
       const full = typingFullRef.current
+      const id = typingIdRef.current
+      typingIdRef.current = null
       setTypingContent(null)
-      setMessages((prev) => {
-        // Replace the last assistant message (which was added as a placeholder) with the full text
-        const copy = [...prev]
-        const lastIdx = copy.length - 1
-        if (copy[lastIdx]?.role === 'assistant') {
-          copy[lastIdx] = { ...copy[lastIdx], content: full }
-        }
-        return copy
-      })
+      setTypingId(null)
+      setMessages((prev) => prev.map(m => (m.id === id ? { ...m, content: full } : m)))
     }
   }, [])
 
@@ -190,16 +115,38 @@ export default function ChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading, typingContent])
 
-  // Close on Escape key
+  // Close on Escape key (en modo voz, Escape primero termina la conversación de voz)
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsOpen(false)
+      if (e.key !== 'Escape') return
+      if (modoVoz) setModoVoz(false)
+      else setIsOpen(false)
     }
     if (isOpen) {
       document.addEventListener('keydown', handleKey)
       return () => document.removeEventListener('keydown', handleKey)
     }
-  }, [isOpen])
+  }, [isOpen, modoVoz])
+
+  // Modo voz: el MISMO /api/chat, con modo 'voz' (respuesta corta, sin markdown).
+  // El historial se lee al momento de preguntar, antes de agregar la pregunta.
+  const preguntarPorVoz = useCallback((texto: string, signal: AbortSignal) => consultarChat({
+    message: texto,
+    history: messagesRef.current.slice(-6),
+    clientId: clientId || getActiveClientSlug(),
+    modo: MODO_VOZ,
+    signal,
+  }), [clientId])
+  const agregarPreguntaDeVoz = useCallback((texto: string) => {
+    setMessages(prev => [...prev, { role: 'user', content: texto, timestamp: new Date() }])
+  }, [])
+  const agregarRespuestaDeVoz = useCallback((texto: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content: texto, timestamp: new Date() }])
+  }, [])
+  const cerrarModoVoz = useCallback(() => {
+    setModoVoz(false)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }, [])
 
   // Focus input when opened
   useEffect(() => {
@@ -208,8 +155,9 @@ export default function ChatWidget() {
 
   async function sendMessage(text: string) {
     if (!text.trim() || isLoading) return
+    skipAnimation()
 
-    const userMessage: ChatMessage & { timestamp?: Date } = {
+    const userMessage: MensajeChat = {
       role: 'user',
       content: text,
       timestamp: new Date(),
@@ -219,39 +167,34 @@ export default function ChatWidget() {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          history: messages.slice(-6),
-          client_id: clientId || getActiveClientSlug(),
-        }),
+      const fullText = await consultarChat({
+        message: text,
+        history: messages.slice(-6),
+        clientId: clientId || getActiveClientSlug(),
       })
 
-      if (!res.ok) throw new Error('Error en la respuesta')
-
-      const data = await res.json()
-      const fullText: string = data.response || ''
-
       // Add placeholder message immediately (empty), then animate
+      const idRespuesta = siguienteIdMensaje++
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: '', timestamp: new Date() },
+        { role: 'assistant', content: '', timestamp: new Date(), id: idRespuesta },
       ])
 
       // Kick off typewriter
       typingFullRef.current = fullText
       typingIndexRef.current = 0
+      typingIdRef.current = idRespuesta
+      setTypingId(idRespuesta)
       setTypingContent('')
 
       const CHARS_PER_TICK = 4
       const TICK_MS = 15
 
       typingTimerRef.current = setInterval(() => {
-        typingIndexRef.current = Math.min(
-          typingIndexRef.current + CHARS_PER_TICK,
-          fullText.length
+        // El JSON de una gráfica no se "teclea": el corte salta el bloque completo.
+        typingIndexRef.current = corteSinPartirBloques(
+          fullText,
+          Math.min(typingIndexRef.current + CHARS_PER_TICK, fullText.length),
         )
         const partial = fullText.slice(0, typingIndexRef.current)
         setTypingContent(partial)
@@ -259,16 +202,11 @@ export default function ChatWidget() {
         if (typingIndexRef.current >= fullText.length) {
           clearInterval(typingTimerRef.current!)
           typingTimerRef.current = null
+          typingIdRef.current = null
           setTypingContent(null)
-          // Write the full text into the messages array only once, at animation end
-          setMessages((prev) => {
-            const copy = [...prev]
-            const lastIdx = copy.length - 1
-            if (copy[lastIdx]?.role === 'assistant') {
-              copy[lastIdx] = { ...copy[lastIdx], content: fullText }
-            }
-            return copy
-          })
+          setTypingId(null)
+          // El texto completo va al mensaje de ESTA respuesta (por id), una sola vez.
+          setMessages((prev) => prev.map(m => (m.id === idRespuesta ? { ...m, content: fullText } : m)))
         }
       }, TICK_MS)
     } catch {
@@ -276,7 +214,7 @@ export default function ChatWidget() {
         ...prev,
         {
           role: 'assistant',
-          content: 'Hubo un error al procesar tu mensaje. Intenta de nuevo.',
+          content: MENSAJE_ERROR_CHAT,
           timestamp: new Date(),
         },
       ])
@@ -288,7 +226,8 @@ export default function ChatWidget() {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => { setModoVoz(false); setIsOpen(true) }}
+        aria-label="Abrir chat con fullsite IA"
         className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
       >
         <MessageCircle size={22} />
@@ -372,8 +311,8 @@ export default function ChatWidget() {
 
         {/* Message bubbles */}
         {messages.map((msg, i) => {
-          // For the last assistant message during animation, use typingContent for display
-          const isAnimating = typingContent !== null && i === messages.length - 1 && msg.role === 'assistant'
+          // El mensaje que se está escribiendo (por id) muestra el texto parcial.
+          const isAnimating = typingContent !== null && msg.id !== undefined && msg.id === typingId
           const displayContent = isAnimating ? typingContent! : msg.content
           return (
             <div
@@ -393,18 +332,9 @@ export default function ChatWidget() {
                       : 'bg-[var(--surface)] text-[var(--text-1)] border border-[var(--line)]/60 shadow-sm rounded-tl-md'
                   }`}
                 >
-                  {(() => {
-                    if (msg.role !== 'assistant') {
-                      return <div className="whitespace-pre-wrap">{renderMarkdown(displayContent)}</div>
-                    }
-                    const { clean, chart } = extractChart(displayContent)
-                    return (
-                      <>
-                        <div className="whitespace-pre-wrap">{renderMarkdown(clean)}</div>
-                        {chart && <MiniChart chart={chart} />}
-                      </>
-                    )
-                  })()}
+                  {msg.role !== 'assistant'
+                    ? <div className="whitespace-pre-wrap">{renderMarkdown(displayContent)}</div>
+                    : <ContenidoAsistente texto={displayContent} />}
                 </div>
               </div>
             </div>
@@ -429,35 +359,24 @@ export default function ChatWidget() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input — safe area for iOS home indicator */}
-      <div className="shrink-0 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-[var(--line)]/60 bg-[var(--surface)]">
-        <form
-          onSubmit={(e) => { e.preventDefault(); sendMessage(input) }}
-          className="flex gap-2"
-        >
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage(input)
-              }
-            }}
-            placeholder="Escribe tu pregunta..."
-            className="flex-1 text-sm bg-[var(--surface-2)] border border-[var(--line)] rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/40 transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="w-10 h-10 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all disabled:opacity-30 shadow-sm flex items-center justify-center shrink-0"
-          >
-            <Send size={16} className="-ml-0.5" />
-          </button>
-        </form>
-      </div>
+      {/* Input — safe area for iOS home indicator. Dictado y modo voz viven aquí. */}
+      <ComposerChat
+        valor={input}
+        setValor={setInput}
+        alEnviar={sendMessage}
+        inputRef={inputRef}
+        cargando={isLoading}
+        alAbrirModoVoz={() => setModoVoz(true)}
+      />
+
+      {modoVoz && (
+        <ModoVozPanel
+          preguntar={preguntarPorVoz}
+          alPreguntar={agregarPreguntaDeVoz}
+          alResponder={agregarRespuestaDeVoz}
+          alCerrar={cerrarModoVoz}
+        />
+      )}
     </div>
   )
 }

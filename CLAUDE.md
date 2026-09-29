@@ -30,9 +30,15 @@ Restaurante AMALAY (Monterrey, MX). Este proyecto conecta Claude Code a los dato
 **La fuente viva son las vistas OCM por-tenant:** `ocm_daily`, `ocm_waiter_rankings`,
 `ocm_menu_groups`, `ocm_menu_items`.
 
-`wansoft_daily` y `ops_daily` están **muertas** (sin datos desde jul-2026). No las uses
-como fuente aunque el código viejo todavía las consulte (`api/chat`, `api/coach`,
-`api/predict` siguen apuntando ahí — es deuda conocida, OCM Fase 3).
+`wansoft_daily` y `ops_daily` están **muertas** (sin datos nuevos; feed de Wansoft caído
+desde 2026-09-08). Sólo sirven como histórico importado, nunca como dato de hoy.
+
+**La IA del dueño (chat, voz, coach, gráficas, agentes del dashboard) lee Fullsite primero**
+vía funciones `fs_*` y `pos_orders`, con la regla única de venta `fs_es_venta` y "hoy" =
+día de venta. Reglas, funciones, rutas, variables y pendientes:
+[`docs/ai/IA-DEL-DUENO.md`](docs/ai/IA-DEL-DUENO.md). **Léelo antes de tocar
+`api/chat`, `api/voice`, `api/transcribe`, `lib/chat-*`, `lib/voz/*`, `lib/graficas-chat.ts`
+o `lib/agents/*`.** (`api/predict` y los agentes de Python aún leen legacy — deuda conocida.)
 
 Esquema de las tablas legacy: [`docs/knowledge/wansoft/TABLAS-LEGACY.md`](docs/knowledge/wansoft/TABLAS-LEGACY.md).
 

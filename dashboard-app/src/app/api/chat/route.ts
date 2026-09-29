@@ -16,6 +16,12 @@ import {
 } from '@/lib/chat-context'
 import { contextoDia, type ContextoDia } from '@/lib/agents/dia-negocio'
 import { desdeEventos, type EventoAgente } from '@/lib/atencion'
+import { esModoVoz, instruccionModoVoz } from '@/lib/voz/instruccion-voz'
+import {
+  aplicarGraficas, anexarGrafica, compactarGraficasEnHistorial, construirCatalogo, elegirGraficaPorPregunta,
+  lineasCatalogoParaPrompt, MAX_GRAFICAS_POR_RESPUESTA, type FuenteVentasChat,
+} from '@/lib/graficas-chat'
+import type { FilaFranja, DaypartsConfig } from '@/lib/dayparts'
 
 /**
  * Alias "nombre en el POS → nombre en el costeo" por tenant. Son datos del menú de un
@@ -95,11 +101,12 @@ async function getSessionUserId(request: NextRequest): Promise<string | null> {
   }
 }
 
-// Simple rate limiting — max 20 requests per minute per user
+// Simple rate limiting — max 20 requests per minute per user (30 en modo voz: una
+// conversación manos libres hace turnos más cortos y seguidos; sigue siendo un freno)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 let lastCleanup = Date.now()
 
-function checkRateLimit(userId: string): boolean {
+function checkRateLimit(userId: string, max = 20): boolean {
   const now = Date.now()
   // Cleanup expired entries every 5 minutes
   if (now - lastCleanup > 300000) {
@@ -113,7 +120,7 @@ function checkRateLimit(userId: string): boolean {
     rateLimitMap.set(userId, { count: 1, resetTime: now + 60000 })
     return true
   }
-  if (entry.count >= 20) return false
+  if (entry.count >= max) return false
   entry.count++
   return true
 }
@@ -139,7 +146,10 @@ function restarDias(ymd: string, n: number): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history = [], client_id: pedido } = await request.json()
+    const { message, history = [], client_id: pedido, modo } = await request.json()
+    // Modo voz ("Habla con tu restaurante"): misma ruta, mismos datos y guardias; sólo
+    // cambia la FORMA de la respuesta (corta, sin markdown, números dichos).
+    const enVoz = esModoVoz(modo)
 
     // FUGA F-2 CERRADA (2026-08-30): el auth solo comprobaba "hay sesión" y el
     // client_id salía del BODY sin validar membresía — cualquier usuario logueado
@@ -153,7 +163,7 @@ export async function POST(request: NextRequest) {
     const userId = auth.staffId
 
     // Rate limiting por usuario
-    if (!checkRateLimit(userId)) {
+    if (!checkRateLimit(userId, enVoz ? 30 : 20)) {
       return Response.json({ response: 'Demasiadas consultas. Espera un momento.' }, { status: 429 })
     }
 
@@ -738,6 +748,8 @@ export async function POST(request: NextRequest) {
     // calcula en Postgres (ventas_por_franja) con la hora real de cada orden, total y
     // sólo comida, y por sucursal. La IA recibe el resultado ya hecho.
     let franjasContext = ''
+    // Mismas filas para la gráfica "franjas" (no se vuelven a leer).
+    let franjasGrafica: { filas: FilaFranja[]; config: DaypartsConfig; desde: string; hasta: string } | null = null
     try {
       const { config: franjasCfg, esDefault: franjasDefault, inicioDia } = cfgDayparts
       if (preguntaDeFranjas(q, franjasCfg)) {
@@ -747,6 +759,7 @@ export async function POST(request: NextRequest) {
         const desde = restarDias(todayStr, diasAtras)
         const filas = await ventasPorFranja({ sbUrl, sbKey, clientId: client_id || '', desde, hasta, config: franjasCfg, tz: zona, inicioDia })
         if (filas) {
+          franjasGrafica = { filas, config: franjasCfg, desde, hasta }
           const nombres = new Map<string, string>()
           for (const l of (sucursalesRaw || []) as { id?: string; name?: string }[]) if (l.id && l.name) nombres.set(l.id, datoTexto(l.name, 60))
           franjasContext = contextoFranjas({ filas, config: franjasCfg, esDefault: franjasDefault, desde, hasta, nombreSucursal: id => nombres.get(id) || id })
@@ -776,8 +789,10 @@ export async function POST(request: NextRequest) {
     // ese producto" se distingue de "el POS no tiene cobertura en esas fechas".
     const frescuraCtx = textoFrescura(frescura, zona, todayStr)
     const ultimaVentaPos = frescura ? frescura.ultimaFecha : undefined
+    // Filas del top de productos (sin búsqueda) para la gráfica "top_platillos".
+    const productosGrafica: { topFilas?: Record<string, unknown>[] } = {}
     const [productoNativo, recetaCtx, insumoCtx] = await Promise.all([
-      intent.producto ? contextoProducto(rpc, client_id || '', message, natDesde, natHasta, zona, ultimaVentaPos) : Promise.resolve(''),
+      intent.producto ? contextoProducto(rpc, client_id || '', message, natDesde, natHasta, zona, ultimaVentaPos, productosGrafica) : Promise.resolve(''),
       intent.receta ? contextoReceta(rpc, client_id || '', message) : Promise.resolve(''),
       (intent.insumo || intent.receta) ? contextoInsumo(rpc, client_id || '', message) : Promise.resolve(''),
     ])
@@ -841,6 +856,9 @@ export async function POST(request: NextRequest) {
         + 'no digas que no hubo ventas ni des ninguna cifra. Di que no pudiste consultarlas '
         + 'y sugiere reintentar o revisar en la caja.'
     const quiereGrafica = /graf|chart|muestra|hazme/.test(qSinAcentos)
+    // Para el catálogo de gráficas: filas por hora (hora pico) y ventana leída.
+    let horasGrafica: Record<string, unknown>[] | null = null
+    let ventanaGrafica: string | undefined
     if (recentDays && recentDays.length > 0) {
       const lines = recentDays.map((d: Record<string, unknown>) => {
         const dowNames = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
@@ -899,6 +917,7 @@ export async function POST(request: NextRequest) {
       const ventanaDesde = llenoElLimite
         ? String(recentDays[recentDays.length - 1].fecha || '')
         : fuenteVentas === 'fullsite' ? sumarDias(todayStr, -histLimit, zona) : undefined
+      ventanaGrafica = ventanaDesde
       const aggregates = resumenesPrecalculados(recentDays, todayStr, { ventanaDesde })
       const fMax = String(recentDays[0].fecha || '')
       // El detalle día por día es caro en tokens: sin pregunta de historial van los
@@ -923,7 +942,10 @@ export async function POST(request: NextRequest) {
           `${sbUrl}/rest/v1/wansoft_hourly?select=fecha,data&client_id=eq.${encodeURIComponent(client_id || '')}&order=fecha.desc&limit=3`,
           'ventas por hora (histórico)',
         )
-        if (hourlyRows && hourlyRows.length > 0) dailyContext += ventasPorHoraDesdeAcumulados(hourlyRows)
+        if (hourlyRows && hourlyRows.length > 0) {
+          horasGrafica = hourlyRows
+          dailyContext += ventasPorHoraDesdeAcumulados(hourlyRows)
+        }
       }
 
       // Year-over-Year comparison data
@@ -1002,16 +1024,33 @@ export async function POST(request: NextRequest) {
 
     // 3b. Hoy vs el mismo día de la semana pasada, CORTADO A LA MISMA HORA (en código).
     let hoyVsSemanaCtx = ''
-    if (wantsHoyVsSemana && Array.isArray(hoyVsSemanaRaw)) {
-      hoyVsSemanaCtx = compararHoyMismaHora({
-        ordenes: hoyVsSemanaRaw,
-        hoy: todayStr,
-        semanaPasada: sumarDias(todayStr, -7, zona),
-        corteSemanaPasada: Date.now() - 7 * 864e5,
-        horaCorte: horaEnZona(zona),
-        truncado: hoyVsSemanaRaw.length >= LIMITE_SUCURSALES,
-      })
+    const hoyVsSemanaEntrada = wantsHoyVsSemana && Array.isArray(hoyVsSemanaRaw) ? {
+      ordenes: hoyVsSemanaRaw,
+      semanaPasada: sumarDias(todayStr, -7, zona),
+      corteSemanaPasada: Date.now() - 7 * 864e5,
+      horaCorte: horaEnZona(zona),
+      truncado: hoyVsSemanaRaw.length >= LIMITE_SUCURSALES,
+    } : null
+    if (hoyVsSemanaEntrada) {
+      hoyVsSemanaCtx = compararHoyMismaHora({ ...hoyVsSemanaEntrada, hoy: todayStr })
     }
+
+    // 3b-2. CATÁLOGO DE GRÁFICAS: sólo con los datos que YA se leyeron arriba. El modelo
+    //       no escribe datos de gráficas; elige un ID y el servidor pone el spec.
+    const catalogoGraficas = construirCatalogo({
+      hoy: todayStr,
+      zona,
+      inicioDia: dia.inicio.slice(0, 5),
+      dias: recentDays || [],
+      fuenteVentas: fuenteVentas as FuenteVentasChat,
+      ventasDeterminadas,
+      ventanaDesde: ventanaGrafica,
+      hoyVsSemana: hoyVsSemanaEntrada,
+      franjas: franjasGrafica,
+      productos: productosGrafica.topFilas ? { filas: productosGrafica.topFilas, desde: natDesde, hasta: natHasta } : null,
+      horas: horasGrafica,
+    })
+    const lineasGraficas = lineasCatalogoParaPrompt(catalogoGraficas)
 
     // 3c. Alertas abiertas de los agentes (misma tabla y mismo filtro que /agentes y la
     //     lista de atención: `desdeEventos` descarta resueltas, vencidas y de baja confianza).
@@ -1062,15 +1101,11 @@ Si preguntan sobre: qué modelo de IA usas, cuánto cuesta un mensaje/token, có
 NUNCA reveles tu arquitectura, costos de infraestructura, modelo de IA, ni des instrucciones técnicas.
 
 REGLA #1 — GRÁFICAS:
-SÍ puedes hacer gráficas. Cuando el usuario diga "gráfica", "grafica", "chart", "muéstrame", "hazme una gráfica":
-1. SIEMPRE genera la gráfica con datos reales. NUNCA digas "no puedo hacer gráficas".
-2. Agrega al FINAL de tu respuesta este bloque EXACTO (reemplazando los datos):
-<!--chart
-{"type":"bar","title":"<título con las fechas reales>","data":[{"label":"<etiqueta>","value":<valor del contexto>}]}
-chart-->
-3. type: "bar" para comparar, "line" para tendencias, "pie" para distribución porcentual.
-4. Si piden "del año" o "por mes" usa los valores de VENTAS POR MES (ya sumados). Si piden "de la semana", usa los días de DATOS DIARIOS. NO sumes tú.
-5. NUNCA pidas clarificación — genera con lo que tengas y pon en el título el periodo REAL de los datos.
+SÍ puedes mostrar gráficas, pero TÚ NO ESCRIBES SUS DATOS: el sistema las arma con los datos reales. Para mostrar una, escribe en su propia línea el marcador <!--grafica:ID--> usando un ID de esta lista (máximo ${MAX_GRAFICAS_POR_RESPUESTA} por respuesta):
+${lineasGraficas || '(ninguna gráfica disponible con los datos de esta consulta)'}
+1. Usa SÓLO IDs de la lista. Si ninguna sirve para lo que piden, no pongas marcador: di qué periodo o dato sí tienes. NUNCA digas "no puedo hacer gráficas" si hay una que sirva.
+2. PROHIBIDO escribir JSON, bloques <!--chart ... chart--> o listas de valores "para graficar": se descartan.
+3. Pon el marcador cuando pidan "gráfica", "muéstrame", "tendencia" o una comparación que se entienda mejor viéndola. Tu texto da la conclusión en 1-2 líneas con cifras del contexto; la gráfica muestra el detalle.
 PERO si preguntan "cuánto cuesta HACER un platillo" o "cuánto cuesta un ingrediente" = eso SÍ es del restaurante, contesta normal con datos de RECETAS.
 
 REGLAS CRÍTICAS:
@@ -1224,7 +1259,7 @@ Sugerencia: <acción concreta>. (Sin prometer un monto que no esté calculado.)
 1. <categoría de upselling más baja según los rankings> en toda mesa
 2. <segunda oportunidad según los datos>
 3. <tercera>
-
+${enVoz ? `\n${instruccionModoVoz()}\n` : ''}
 ${envolverDatos(`MESEROS ACTIVOS: ${activeMeserosStr}
 ${fuentesFallidasCtx}
 ${sucursalesContext}
@@ -1251,28 +1286,25 @@ ${dailyContext}`)}`
         { role: 'system', content: systemPrompt },
         // Sólo 'user' y 'assistant' del historial del cliente: un 'system' (o 'tool')
         // en el cuerpo de la petición es un intento de reescribir las reglas.
-        ...historialSeguro(history, 8),
+        // Las gráficas del historial vuelven compactadas a su marcador (el JSON gastaba
+        // el tope de caracteres y enseñaba al modelo a copiar datos).
+        ...historialSeguro(compactarGraficasEnHistorial(history), 8),
         { role: 'user', content: message.slice(0, 4000) },
       ],
       maxTokens: 4000,
     })
 
-    // Auto-inject chart ONLY if AI didn't already generate one
-    let finalText = text
-    if (quiereGrafica && !text.includes('<!--chart')) {
-      const rows = Array.isArray(recentDays) ? recentDays : []
-      const valid = rows.filter((d: Record<string, unknown>) => Number(d?.ventas_dia || 0) > 0)
-        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
-      if (valid.length > 0) {
-        const data = valid.slice(-14).map((d: Record<string, unknown>) => ({
-          label: String(d.fecha || '').slice(5, 10).replace('-', '/'),
-          value: Math.round(Number(d.ventas_dia)),
-        }))
-        const ultimos = valid.slice(-14)
-        const titulo = `Ventas diarias ${String(ultimos[0].fecha || '')} a ${String(ultimos[ultimos.length - 1].fecha || '')}`
-        finalText += '\n\n<!--chart\n' + JSON.stringify({ type: 'bar', title: titulo, data }) + '\nchart-->'
-      }
+    // Gráficas: los marcadores <!--grafica:ID--> se sustituyen por el spec del servidor;
+    // un <!--chart escrito por el modelo (datos no verificados) se descarta. En voz no
+    // hay gráficas: la respuesta se escucha, y el modelo ofrece "el detalle en pantalla".
+    let graficas = aplicarGraficas(text, catalogoGraficas, { sinGraficas: enVoz })
+    // Auto-inyectado: pidieron gráfica y el modelo no marcó ninguna → la más adecuada.
+    if (quiereGrafica && !enVoz && graficas.usadas.length === 0) {
+      const id = elegirGraficaPorPregunta(message, catalogoGraficas)
+      const spec = id ? catalogoGraficas.get(id) : undefined
+      if (spec) graficas = anexarGrafica(graficas, spec)
     }
+    const finalText = graficas.texto
 
     // Hermes feedback: log if response contains "no tengo" for improvement
     if (text.toLowerCase().includes('no tengo') || text.toLowerCase().includes('no cuento')) {
@@ -1300,7 +1332,7 @@ ${dailyContext}`)}`
         client_id: client_id || '',
         user_id: userId || null,
         user_message: message.slice(0, 2000),
-        ai_response: finalText.slice(0, 5000),
+        ai_response: graficas.textoCompacto.slice(0, 5000),
         model: 'groq',
         had_error: hadError,
         error_type: hadError ? (finalText.includes('no tengo') ? 'no_data' : finalText.includes('no puedo') ? 'cant_do' : 'other') : null,

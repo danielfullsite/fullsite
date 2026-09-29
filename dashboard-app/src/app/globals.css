@@ -174,6 +174,17 @@ body:has(.pos-service-shell) {
   --surface-1: var(--surface);
   --border: var(--line);
 
+  /* Dataviz (gráficas del chat): paleta categórica en orden FIJO (slots 1–5) + gris
+   * de contexto. Validada con dataviz/validate_palette.js sobre --surface oscuro
+   * #0c1012: todas las pruebas PASS (CVD adyacente ΔE ≥ 8.4, visión normal ≥ 19.3,
+   * contraste ≥ 3:1). No agregar slots sin volver a validar. */
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-ctx: #898781;
+
   color-scheme: dark;
 }
 
@@ -226,6 +237,16 @@ body:has(.pos-service-shell) {
   /* Aliases for component compatibility */
   --surface-1: var(--surface);
   --border: var(--line);
+
+  /* Dataviz — mismos cinco matices, pasos para papel. Validada sobre #ffffff: PASS
+   * (CVD adyacente ΔE ≥ 9.1, visión normal ≥ 19.6). Slots 3–5 quedan bajo 3:1 de
+   * contraste: la gráfica SIEMPRE ofrece "Ver tabla" y leyenda (canal de alivio). */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-ctx: #898781;
 
   color-scheme: light;
 }

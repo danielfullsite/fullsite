@@ -60,5 +60,7 @@
 	</dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Fullsite usa el micrófono para dictar notas de voz y hablar con el asistente de tu restaurante.</string>
 </dict>
 </plist>
