@@ -1,5 +1,5 @@
 -- IA — LECTURA UNIVERSAL POR RESTAURANTE (estado final consolidado).
--- Aplicada en staging el 2026-09-28 (4 pasos iterativos); este archivo es el estado final
+-- Aplicada en staging y PRODUCCIÓN el 2026-09-28; este archivo es el estado final
 -- equivalente, idempotente. Ver docs/ai/IA-DEL-DUENO.md §3b.
 --
 -- Qué hace: el AI del dueño puede leer CUALQUIER tabla de public que tenga `client_id text`
@@ -43,14 +43,14 @@ grant execute on function ia.es_venta(text, text) to authenticated, service_role
 
 -- Tablas que la IA nunca ve (secretos, operación interna, colas técnicas).
 create or replace function ia._excluida(p_tabla text) returns boolean language sql immutable as $$
-  select p_tabla ~ '^(credentials_vault|client_users|push_subscriptions|pos_pin_throttle|pos_mutation_authority|pos_save_operations|pos_terminals|pos_staff_permissions|pos_print_jobs|pos_bridge_logs|pos_recipes_old|pos_authority_transitions|chat_logs|memories|agent_feedback|demo_generator_state|lab_issues|delivery_dlq)$'
+  select p_tabla ~ '^(credentials_vault|client_users|push_subscriptions|pos_pin_throttle|pos_mutation_authority|pos_save_operations|pos_terminals|pos_staff_permissions|pos_print_jobs|pos_bridge_logs|pos_recipes_old|pos_authority_transitions|chat_logs|memories|agent_feedback|demo_generator_state|lab_issues|delivery_dlq|wansoft_data)$'
       or p_tabla ~ '^(platform_|integration_|ia_|_)'
-      or p_tabla ~ '_operations$'
+      or p_tabla ~ '(_operations$|_respaldo|_backup|fingerprint|huella|biometr)'
 $$;
 
 -- Columnas sensibles: nunca se otorgan al rol.
 create or replace function ia._columna_sensible(p_col text) returns boolean language sql immutable as $$
-  select lower(p_col) ~ '((^|_)pin($|_)|pin_hash|password|passw|contrasen|token|secret|hash|api_?key|credential|signature|firma_|cert|private|clabe|cuenta_banc|card_number|numero_tarjeta|cvv|curp|(^|_)rfc($|_)|(^|_)nss($|_)|email|correo|telefono|phone|celular|whatsapp|direccion|address|(^|_)ip($|_)|fingerprint|huella|webhook|_url$)'
+  select lower(p_col) ~ '((^|_)pin($|_)|pin_hash|password|passw|contrasen|token|secret|hash|api_?key|credential|signature|firma_|cert|private|clabe|cuenta_banc|card_number|numero_tarjeta|cvv|curp|(^|_)rfc($|_)|(^|_)nss($|_)|email|correo|telefono|phone|celular|whatsapp|direccion|address|(^|_)ip($|_)|fingerprint|huella|webhook|_url$|(^|_)calle($|_)|colonia|no_interior|no_exterior|num_ext|num_int|payload)'
 $$;
 
 create or replace function ia._firma_esquema() returns text language sql stable as $$

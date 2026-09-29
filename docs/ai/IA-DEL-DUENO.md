@@ -196,6 +196,15 @@ LLM (Groq, tool calling) ──► consultar_datos({sql, para_que}) ──► rp
   y datos.
 - Para **excluir** una tabla completa: agrégala a `ia._excluida`. Para excluir una
   columna: `ia._columna_sensible`. (Cambios de SQL en migraciones, no aquí.)
+- **Excluidas hoy (2026-09-28, prod y staging):** secretos y colas técnicas (`credentials_vault`,
+  `client_users`, `push_subscriptions`, `pos_terminals`, `platform_*`, `integration_*`, …),
+  **biométricos** (cualquier tabla con `fingerprint|huella|biometr`), **respaldos**
+  (`*_respaldo*`, `*_backup*`) y **`wansoft_data`** (guarda cuentas bancarias y otros blobs).
+  Columnas nunca visibles: PINs, tokens, hashes, correos, teléfonos, direcciones (incluidas
+  `calle`, `colonia`, `no_interior/exterior`), RFC, CURP, CLABE, tarjetas y cualquier
+  `*payload*` (p. ej. `delivery_orders.raw_payload`). En prod quedaron 82 tablas legibles.
+- **Antes de agregar una tabla con datos personales**, revisa que sus columnas sensibles
+  caigan en `ia._columna_sensible`; si no, agrégalas ahí en la misma migración.
 - Para que la IA entienda mejor una tabla: ponle `comment on table` — llega como
   descripción en el mapa (se trata como dato, no como instrucción).
 
