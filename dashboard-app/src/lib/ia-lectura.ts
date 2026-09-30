@@ -247,7 +247,20 @@ export function pistasDelMapa(tablas: TablaMapa[]): string {
     if (cols.has('items')) p.push('items (json) = [{nombre, cantidad, precio, subtotal}] — desglosa con jsonb_array_elements(items) y ->> .')
     if (cols.has('status')) p.push('Una orden es VENTA sólo si es_venta(status, payment_status) — úsalo SIEMPRE para ventas.')
     if (cols.has('dia_venta')) p.push('dia_venta = día de venta (úsalo para fechas, no created_at).')
+    if (cols.has('created_at')) {
+      const cierre = cols.has('closed_at') ? ' y closed_at = hora de cierre/cobro' : ''
+      p.push('created_at = hora en que se ABRIÓ la orden' + cierre + ": SÍ puedes analizar por hora del día o franja (comida, cena) — extract(hour from created_at) o date_trunc('hour', created_at), filtrando por dia_venta. created_at trae zona horaria; para horas locales conviértelo a la zona del restaurante (created_at at time zone <zona_del_restaurante>).")
+    }
     pistas.push(p.join(' '))
+  }
+  if (nombres.has('historico_tickets')) {
+    const cols = new Set(tablas.find(t => t.tabla === 'historico_tickets')!.columnas.map(c => c.c))
+    const h = ['historico_tickets [histórico importado] = tickets del sistema anterior (varios años); útil para tendencias largas y estacionalidad. Para fechas recientes manda el POS (pos_orders).']
+    if (cols.has('abierto_local')) {
+      const cierre = cols.has('cerrado_local') ? ', cerrado_local = hora de cierre' : ''
+      h.push(`abierto_local = hora en que se ABRIÓ el ticket (hora local, ya sin zona)${cierre}: SÍ se puede analizar por hora del día o franja horaria sobre años de historia — extract(hour from abierto_local). No es dato calculado, pero SIEMPRE es consultable con consultar_datos.`)
+    }
+    pistas.push(h.join(' '))
   }
   const pos = [...nombres].filter(n => n.startsWith('pos_') && n !== 'pos_orders')
   if (pos.length > 0) pistas.push('Tablas pos_* = datos vivos del POS de Fullsite.')
