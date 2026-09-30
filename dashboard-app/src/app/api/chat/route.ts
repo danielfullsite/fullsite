@@ -1369,7 +1369,7 @@ ${envolverDatos(bloqueDatos)}`
       // algo que venga del usuario o del modelo.
       ciclo = await responderConHerramientas({
         mensajes,
-        modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+        modelo: o => groq.modeloConHerramientas({ ...o, maxTokens: 4000 }),
         consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
         respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
         marcadorGrafica: enVoz ? undefined : c => (specDeConsulta(c) ? `<!--grafica:${claveConsulta(c.n)}-->` : null),
@@ -1419,7 +1419,7 @@ ${envolverDatos(bloqueDatos)}`
         if (hayConsultaLibre) {
           const rep = await responderConHerramientas({
             mensajes: msgsRep,
-            modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+            modelo: o => groq.modeloConHerramientas({ ...o, maxTokens: 4000 }),
             consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
             respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
             presupuestoMs: 12_000,
