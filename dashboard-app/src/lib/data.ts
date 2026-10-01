@@ -293,7 +293,8 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
   const posRecentPromise = posRecentRead.catch(error => { posError = error; return [] as WansoftDaily[] })
   const historicalPromise = sbFetch('wansoft_daily', `select=${WANSOFT_DASHBOARD_SUMMARY_COLUMNS}&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`)
   const [posRecent, data] = await Promise.all([posRecentPromise, historicalPromise])
-  const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
+  const historicalRows = data as Record<string, unknown>[]
+  const wansoftData = dedupeByFecha(historicalRows).slice(0, days).reverse().map(parseRow)
   if (posError && !wansoftData.length) throw posError
   // Merge: for dates that exist in both, prefer pos_orders (live POS data)
   const posDateSet = new Set(posRecent.map(d => d.fecha))
