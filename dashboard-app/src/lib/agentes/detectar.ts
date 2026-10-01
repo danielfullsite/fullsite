@@ -58,6 +58,11 @@ export interface Deteccion {
   recomendacion: string
 }
 
+/** Contexto operativo que evita confundir un acumulado abierto con un cierre. */
+export interface ContextoDeteccion {
+  diaAbierto?: boolean
+}
+
 /** Menos de esto no es un promedio. */
 export const MUESTRA_MINIMA = 2
 /** Debajo de este cambio es ruido del día a día, no una señal. */
@@ -309,8 +314,16 @@ function propinaBaja(datos: WansoftDaily[], dia: WansoftDaily): Deteccion | null
  * consulta nada: si le pasas los días de otro tenant, te da las detecciones de
  * ese otro tenant, y eso es responsabilidad de quien la llama.
  */
-export function detectar(datos: WansoftDaily[], dia: WansoftDaily | null): Deteccion[] {
+export function detectar(
+  datos: WansoftDaily[],
+  dia: WansoftDaily | null,
+  contexto: ContextoDeteccion = {},
+): Deteccion[] {
   if (!dia || datos.length === 0) return []
+
+  // Sin cierre acreditado no hay resultado final. Un agente de ritmo intradía
+  // será otro contrato, con comparables a la misma hora.
+  if (contexto.diaAbierto) return []
 
   const todas = [
     ventaContraSuDia(datos, dia),

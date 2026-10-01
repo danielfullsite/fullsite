@@ -8,8 +8,9 @@ import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, Fi
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getDashboardOperationStatus, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
+import { canShowFinalProjection, dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -159,20 +160,23 @@ export default function DashboardPage() {
   const [atencion, setAtencion] = useState<Atencion[]>([])
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
+  const [estadoOperacion, setEstadoOperacion] = useState<DashboardOperationStatus | null>(null)
 
   useEffect(() => {
+    if (!clientId) return
     let vivo = true
     Promise.all([
       getDeteccionesAgentes().catch(() => []),
-      getTurnoAbierto().catch(() => null),
-    ]).then(([eventos, turno]) => {
+      getDashboardOperationStatus(clientId).catch(() => null),
+    ]).then(([eventos, estado]) => {
       if (!vivo) return
       setAtencion(desdeEventos(eventos))
-      setTurnoAbierto(turno)
+      setEstadoOperacion(estado)
+      setTurnoAbierto(estado?.turnoAbierto ?? null)
       setCargandoTurno(false)
     })
     return () => { vivo = false }
-  }, [])
+  }, [clientId])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -411,7 +415,19 @@ export default function DashboardPage() {
   // amalay y de boruca y CERO de coffee-shop, y el bloque que las leía acabó
   // enseñando las alertas de AMALAY aquí (P0 corregido aparte). `recentData` ya
   // viene acotado al tenant activo, así que no hay forma de que se crucen.
-  const detecciones = detectar(recentData, viewDay)
+  const diaAbierto = dayIsOpenForFinalDetection(
+    viewDay ? String(viewDay.fecha).slice(0, 10) : null,
+    estadoOperacion,
+    selectedDayIdx === 0,
+  )
+  // Las proyecciones de cierre tampoco son hechos mientras Caja tiene un
+  // turno abierto. Usamos el mismo estado que protege a los agentes, no el
+  // reloj del navegador, y cubrimos el turno que cruza medianoche.
+  const puedeMostrarProyeccionFinal = canShowFinalProjection(
+    latestDay ? String(latestDay.fecha).slice(0, 10) : null,
+    estadoOperacion,
+  )
+  const detecciones = detectar(recentData, viewDay, { diaAbierto })
 
   // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
   // no hay una consulta nueva. El patrón más fuerte de una cafetería es el día
@@ -841,7 +857,7 @@ export default function DashboardPage() {
           </div>
           <p className="text-[28px] sm:text-[34px] font-black tracking-[-0.03em] text-[var(--text-1)] tnum mb-1.5">{formatCurrency(monthProgress.monthVentas)}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
-            <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>
+            {puedeMostrarProyeccionFinal && <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>}
             <span>Prom. <span className="font-semibold text-[var(--text-2)] tnum">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>
             <span className="hidden sm:inline">{monthProgress.daysLeft} días restantes</span>
           </div>
@@ -857,7 +873,7 @@ export default function DashboardPage() {
       {/* KPI Summary Cards — 4 across like Toast */}
 
       {/* Prediction Widget */}
-      {show('prediction') && period === 'dia' && (() => {
+      {show('prediction') && period === 'dia' && puedeMostrarProyeccionFinal && (() => {
         const today = latestDay?.fecha || ''
         const todayDate = today ? new Date(today + 'T12:00:00') : new Date()
         const todayDow = todayDate.getDay()
