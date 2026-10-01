@@ -105,10 +105,16 @@ describe('lo que NO se puede romper', () => {
     expect(codigo).not.toMatch(/void auditarCierreContraLaFila\(/)
   })
 
-  it('sin tasa de IVA resoluble no se audita', () => {
+  it('sin regimen fiscal resoluble no se audita', () => {
     // Comparar sin la tasa producia el falso positivo de agosto: 15 eventos, todos
     // x1.16 exacto, que taparon el caso real.
-    expect(codigo).toMatch(/if \(ivaRate === null\) return/)
+    //
+    // Desde el 2026-09-14 no se resuelve solo la TASA sino el REGIMEN completo
+    // (tasa + si el precio ya incluye el impuesto), porque auditar un restaurante
+    // de precios inclusivos con la formula exclusiva acusaria de un faltante del
+    // 16% a cada cuenta cerrada — el mismo envenenamiento por otro lado. Lo que
+    // esta prueba protege es la SALIDA TEMPRANA, no el nombre de la variable.
+    expect(codigo).toMatch(/if \(regimen === null\) return/)
   })
 
   it('una orden cerrada sin renglones no se acusa', () => {
