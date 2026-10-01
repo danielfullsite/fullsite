@@ -1110,7 +1110,7 @@ export async function POST(request: NextRequest) {
 REGLA #2 — CONSULTA LIBRE (herramienta consultar_datos):
 Además de los bloques precalculados tienes el MAPA DE DATOS (dentro del bloque de datos, al final): las tablas de este restaurante con sus columnas y fechas.
 1. RUTA RÁPIDA: si un bloque precalculado ya contesta la pregunta, contesta con él SIN consultar.
-2. Usa consultar_datos para lo demás: cruzar secciones (p. ej. ventas contra asistencia o gastos), tablas que no vienen precalculadas, periodos a la medida, conteos o rankings específicos. Máximo ${MAX_CONSULTAS} consultas por respuesta: pide lo justo y agrega en SQL (GROUP BY, LIMIT).
+2. Usa consultar_datos para lo demás: cruzar secciones (p. ej. ventas contra asistencia o gastos), tablas que no vienen precalculadas, periodos a la medida, análisis por HORA DEL DÍA o FRANJA (comida, cena) con las columnas de hora de apertura/cierre del mapa, conteos o rankings específicos. Si el dato requiere ese nivel de detalle, CONSÚLTALO — no digas "no tengo acceso a ese detalle": si la columna está en el mapa, sí lo tienes. Máximo ${MAX_CONSULTAS} consultas por respuesta: pide lo justo y agrega en SQL (GROUP BY, LIMIT).
 3. SQL de Postgres de sólo lectura (una sentencia SELECT/WITH) con los nombres EXACTOS de tablas y columnas del mapa, sin esquema y sin filtrar por client_id (ya viene filtrado). Funciones permitidas: agregados, fecha/hora (date_trunc, extract, to_char, now), texto, jsonb (jsonb_array_elements, ->, ->>), ventanas y es_venta(status, payment_status).
 4. Sumas, promedios, conteos y porcentajes se hacen EN SQL; nunca los calcules tú.
 5. Si la consulta regresa error, corrígela con el mensaje; si no puedes, di que no pudiste consultarlo.
@@ -1369,7 +1369,7 @@ ${envolverDatos(bloqueDatos)}`
       // algo que venga del usuario o del modelo.
       ciclo = await responderConHerramientas({
         mensajes,
-        modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+        modelo: o => groq.modeloConHerramientas({ ...o, maxTokens: 4000 }),
         consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
         respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
         marcadorGrafica: enVoz ? undefined : c => (specDeConsulta(c) ? `<!--grafica:${claveConsulta(c.n)}-->` : null),
@@ -1419,7 +1419,7 @@ ${envolverDatos(bloqueDatos)}`
         if (hayConsultaLibre) {
           const rep = await responderConHerramientas({
             mensajes: msgsRep,
-            modelo: o => groq.groqConHerramientas({ ...o, maxTokens: 4000 }),
+            modelo: o => groq.modeloConHerramientas({ ...o, maxTokens: 4000 }),
             consultar: (sql, ms) => ejecutarConsulta(credLectura, client_id, sql, ms),
             respaldo: m => groq.groqChat({ messages: m, maxTokens: 4000 }),
             presupuestoMs: 12_000,

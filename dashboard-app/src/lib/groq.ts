@@ -200,6 +200,110 @@ export async function groqConHerramientas(o: OpcionesHerramientas): Promise<{ co
   return { content: typeof msg.content === 'string' ? msg.content : '', tool_calls: calls }
 }
 
+// ─── Tool calling con Claude (Anthropic) ─────────────────────────────────
+// Mismo contrato que groqConHerramientas (entra/sale en formato OpenAI), pero corre
+// sobre Claude Haiku 4.5, mucho más confiable decidiendo cuándo consultar y escribiendo
+// el SQL de los cruces. El ciclo (responderConHerramientas) no cambia: aquí se traduce
+// OpenAI -> Anthropic a la entrada y Anthropic -> OpenAI a la salida.
+
+interface BloqueAnthropic { type: string; [k: string]: unknown }
+interface MsgAnthropic { role: 'user' | 'assistant'; content: BloqueAnthropic[] }
+
+/** Traduce los mensajes del ciclo (formato OpenAI) al formato de Anthropic. */
+function aMensajesAnthropic(messages: MensajeConHerramientas[]): { system: string; msgs: MsgAnthropic[] } {
+  let system = ''
+  let systemTomado = false
+  const msgs: MsgAnthropic[] = []
+  const pushUser = (blocks: BloqueAnthropic[]) => {
+    const last = msgs[msgs.length - 1]
+    if (last && last.role === 'user') last.content.push(...blocks)
+    else msgs.push({ role: 'user', content: blocks })
+  }
+  for (const m of messages) {
+    if (m.role === 'system') {
+      // El primer system va al parámetro top-level; uno posterior (p. ej. NOTA_CIERRE)
+      // se manda como turno de usuario para conservar su posición al final.
+      if (!systemTomado) { system = m.content; systemTomado = true }
+      else pushUser([{ type: 'text', text: m.content }])
+    } else if (m.role === 'user') {
+      pushUser([{ type: 'text', text: m.content }])
+    } else if (m.role === 'assistant') {
+      const blocks: BloqueAnthropic[] = []
+      if (m.content) blocks.push({ type: 'text', text: m.content })
+      for (const tc of m.tool_calls ?? []) {
+        let input: unknown = {}
+        try { input = JSON.parse(tc.function.arguments || '{}') } catch { input = {} }
+        blocks.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input })
+      }
+      // Anthropic no acepta content vacío en assistant.
+      msgs.push({ role: 'assistant', content: blocks.length ? blocks : [{ type: 'text', text: '…' }] })
+    } else if (m.role === 'tool') {
+      // Los resultados de herramientas son bloques tool_result DENTRO de un turno de usuario;
+      // varios (consultas en paralelo) se agrupan en el mismo turno.
+      pushUser([{ type: 'tool_result', tool_use_id: m.tool_call_id, content: m.content }])
+    }
+  }
+  return { system, msgs }
+}
+
+/**
+ * Una vuelta del modelo con herramientas sobre Claude Haiku. SIN reintentos ni respaldo:
+ * quien llama (modeloConHerramientas / el ciclo) maneja el presupuesto y el fallback.
+ */
+export async function anthropicConHerramientas(o: OpcionesHerramientas): Promise<{ content: string; tool_calls: LlamadaHerramienta[] }> {
+  const key = getAnthropicKey()
+  if (!key) throw new Error('ANTHROPIC_API_KEY not configured')
+  const { system, msgs } = aMensajesAnthropic(o.messages)
+  // toolChoice 'none' = contestar ya: se logra no mandando herramientas.
+  const conTools = (o.toolChoice ?? 'auto') !== 'none'
+  const tools = o.tools.map(t => ({ name: t.function.name, description: t.function.description, input_schema: t.function.parameters }))
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: o.maxTokens || 2000,
+      temperature: o.temperature ?? 0.2,
+      system,
+      messages: msgs,
+      ...(conTools ? { tools, tool_choice: { type: 'auto' } } : {}),
+    }),
+    signal: AbortSignal.timeout(Math.max(1000, o.timeoutMs)),
+  })
+  if (!res.ok) {
+    const err = await res.text().catch(() => '')
+    throw new Error(`Anthropic tools error ${res.status}: ${err.slice(0, 200)}`)
+  }
+  const data = await res.json()
+  const bloques: unknown = data?.content
+  if (!Array.isArray(bloques)) throw new Error('Anthropic tools: respuesta sin content')
+  let content = ''
+  const tool_calls: LlamadaHerramienta[] = []
+  for (const b of bloques as BloqueAnthropic[]) {
+    if (b?.type === 'text' && typeof b.text === 'string') content += b.text
+    else if (b?.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string') {
+      tool_calls.push({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } })
+    }
+  }
+  return { content, tool_calls }
+}
+
+/**
+ * Modelo con herramientas para el ciclo: Claude Haiku primero (mejor cruces/SQL) con Groq
+ * como respaldo QUE CONSERVA las herramientas — así, si un proveedor falla, el chat sigue
+ * pudiendo consultar en vez de declinar. Kill-switch: TOOLS_PROVIDER=groq fuerza Groq.
+ */
+export async function modeloConHerramientas(o: OpcionesHerramientas): Promise<{ content: string; tool_calls: LlamadaHerramienta[] }> {
+  const preferGroq = process.env.TOOLS_PROVIDER === 'groq' || !getAnthropicKey()
+  if (preferGroq) return groqConHerramientas(o)
+  try {
+    return await anthropicConHerramientas(o)
+  } catch (err) {
+    console.warn(`[tools] Anthropic falló (${err instanceof Error ? err.message.slice(0, 80) : 'error'}); respaldo Groq con herramientas`)
+    return groqConHerramientas(o)
+  }
+}
+
 // ─── Streaming (Groq only, no fallback needed for streaming) ─────────────
 
 export async function groqStream(options: ChatOptions): Promise<ReadableStream<Uint8Array>> {
