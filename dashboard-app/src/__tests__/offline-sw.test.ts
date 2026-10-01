@@ -82,6 +82,21 @@ describe('sw.js structure', () => {
     expect(content).toContain('mp-point')
   })
 
+  it('NUNCA cachea /api/dashboard/ — el resumen de ventas es dato vivo, no se sirve viejo', async () => {
+    // Regresion: el SW daba 2.5s a la red y, al vencer, servia la copia cacheada de
+    // horas atras (ventas del dia congeladas). /api/dashboard/ debe estar en
+    // NEVER_CACHE_PATTERNS, igual que pos_orders/pos_mesas.
+    const fs = await import('fs')
+    const path = await import('path')
+    const swPath = path.resolve(__dirname, '../../public/sw.js')
+    const content = fs.readFileSync(swPath, 'utf-8')
+    const bloque = content.slice(
+      content.indexOf('NEVER_CACHE_PATTERNS'),
+      content.indexOf(']', content.indexOf('NEVER_CACHE_PATTERNS')),
+    )
+    expect(bloque.replace(/\\/g, '')).toContain('/api/dashboard/')
+  })
+
   it('bounds runtime network-first requests so WAN loss cannot freeze a mesa navigation', async () => {
     const fs = await import('fs')
     const path = await import('path')

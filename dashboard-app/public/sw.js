@@ -57,6 +57,12 @@ const NEVER_CACHE_PATTERNS = [
   // KDS → IndexedDB alimentado por el bridge).
   /\/rest\/v1\/pos_orders/,
   /\/rest\/v1\/pos_mesas/,
+  // Resumen del dashboard (dueno): dato VIVO de negocio. El SW daba a la red solo
+  // NETWORK_TIMEOUT_MS (2.5s) y, al vencer, servia la copia cacheada de horas atras
+  // (ventas del dia congeladas -> el fantasma de la 1pm). Como pos_orders/pos_mesas:
+  // nunca servir viejo. Sin intercept, la lectura va directa (fetchWithTimeout del
+  // cliente la gobierna); si falla, el dashboard muestra "no disponible", no un numero falso.
+  /\/api\/dashboard\//,
 ]
 
 // ─── /api/pos/db: el proxy de la terminal ES una consulta REST ───────────────
