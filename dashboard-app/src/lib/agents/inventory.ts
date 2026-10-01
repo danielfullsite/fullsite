@@ -18,6 +18,7 @@ interface InventoryProduct {
   category: string | null
   cost_per_unit: number | null
   active: boolean
+  updated_at: string | null
 }
 
 interface Ingredient {
@@ -33,6 +34,16 @@ interface InventoryRow {
   ingredient_id: string
   stock: number
   reorder_point: number | null
+  updated_at: string | null
+}
+
+/** Más allá de esta ventana el stock es un registro histórico, no realidad física. */
+const STOCK_FRESHNESS_MS = 48 * 60 * 60 * 1000
+
+function freshAt(value: string | null | undefined, now: number): boolean {
+  if (!value) return false
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) && time <= now && now - time <= STOCK_FRESHNESS_MS
 }
 
 export async function runInventoryAgent(
@@ -45,12 +56,12 @@ export async function runInventoryAgent(
   // Try pos_inventory_products first (newer multi-tenant table)
   // `id` se agregó el 2026-08-30: es el mismo que `pos_inventory_movements.ingredient_id`
   // y sin él los hallazgos no se pueden calificar contra la realidad.
-  let products: { id: string; name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null }[] = []
+  let products: { id: string; name: string; unit: string; stock: number; reorder_point: number; category: string | null; cost_per_unit: number | null; updated_at: string | null }[] = []
 
   try {
     const rows = await sbGet<InventoryProduct>(
       'pos_inventory_products',
-      `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&reorder_point=gt.0&select=id,name,unit,stock,reorder_point,category,cost_per_unit&order=stock.asc&limit=200`,
+      `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&reorder_point=gt.0&select=id,name,unit,stock,reorder_point,category,cost_per_unit,updated_at&order=stock.asc&limit=200`,
     )
     products = rows.map(r => ({
       id: r.id,
@@ -60,6 +71,7 @@ export async function runInventoryAgent(
       reorder_point: r.reorder_point ?? 0,
       category: r.category,
       cost_per_unit: r.cost_per_unit,
+      updated_at: typeof r.updated_at === 'string' ? r.updated_at : null,
     }))
   } catch {
     // Fallback: pos_ingredients + pos_inventory join
@@ -71,7 +83,7 @@ export async function runInventoryAgent(
         ),
         sbGet<InventoryRow>(
           'pos_inventory',
-          `client_id=eq.${encodeURIComponent(clientId)}&select=ingredient_id,stock,reorder_point&limit=300`,
+          `client_id=eq.${encodeURIComponent(clientId)}&select=ingredient_id,stock,reorder_point,updated_at&limit=300`,
         ),
       ])
       const invMap = new Map(inventory.map(r => [r.ingredient_id, r]))
@@ -89,6 +101,7 @@ export async function runInventoryAgent(
             reorder_point: inv?.reorder_point ?? 0,
             category: ing.category,
             cost_per_unit: ing.cost_per_unit,
+            updated_at: typeof inv?.updated_at === 'string' ? inv.updated_at : null,
           }
         })
         .filter(p => p.reorder_point > 0)
@@ -99,7 +112,44 @@ export async function runInventoryAgent(
 
   if (products.length === 0) return events
 
-  // ── 1. Out of stock (auto-86) ────────────────────────────────────────────
+  // Stock con más de 48h sin evidencia no es una base válida para afirmar que
+  // cocina no puede preparar algo. Primero se publica el problema de calidad;
+  // los hallazgos de faltante/reorden se calculan sólo sobre filas recientes.
+  const fresh = products.filter(p => freshAt(p.updated_at, now))
+  const stale = products.filter(p => !freshAt(p.updated_at, now))
+  if (stale.length > 0) {
+    const latest = stale
+      .map(p => p.updated_at)
+      .filter((at): at is string => typeof at === 'string')
+      .sort()
+      .at(-1) ?? null
+    events.push({
+      client_id: clientId,
+      agent_id: 'inventory',
+      type: 'inventory_data_stale',
+      severity: 'warning',
+      title: `${stale.length} registros de inventario sin actualización reciente`,
+      explanation: `No se usan para declarar faltantes ni compras urgentes. Última evidencia de ese conjunto: ${latest ? new Date(latest).toLocaleString('es-MX') : 'sin fecha'}.`,
+      evidence: {
+        fuente: 'pos_inventory_products/pos_inventory',
+        ventana_horas: STOCK_FRESHNESS_MS / 3600000,
+        registros_desactualizados: stale.length,
+        registros_actuales: fresh.length,
+        ultima_actualizacion_desactualizada: latest,
+      },
+      suggested_action: 'Haz una toma física o sincroniza movimientos antes de usar alertas de stock, reorden o auto-86.',
+      confidence: 0.95,
+      status: 'new',
+      expires_at: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+    })
+  }
+
+  // Sólo las filas con observación reciente pueden producir recomendaciones
+  // operativas. Las obsoletas ya están representadas por el aviso anterior.
+  products = fresh
+  if (products.length === 0) return events
+
+  // ── 1. Stock registrado en cero ──────────────────────────────────────────
   const outOfStock = products.filter(p => p.stock <= 0)
   if (outOfStock.length > 0) {
     const names = outOfStock.slice(0, 5).map(p => p.name).join(', ')
@@ -109,8 +159,8 @@ export async function runInventoryAgent(
       agent_id: 'inventory',
       type: 'out_of_stock',
       severity: 'critical',
-      title: `${outOfStock.length} ingrediente${outOfStock.length > 1 ? 's' : ''} sin stock — auto-86 activo`,
-      explanation: `Sin existencias: ${names}${more}. Los platillos que los requieren no se pueden preparar.`,
+      title: `${outOfStock.length} ingrediente${outOfStock.length > 1 ? 's' : ''} con stock registrado en cero`,
+      explanation: `El registro actual marca cero para: ${names}${more}. Confirma físicamente antes de pausar platillos o comprar.`,
       evidence: {
         // `id` se agregó el 2026-08-30: sin él el hallazgo no se podía cruzar contra
         // `pos_inventory_movements` y por lo tanto no se podía calificar solo.
@@ -140,7 +190,7 @@ export async function runInventoryAgent(
           confirma: ['restock', 'entry', 'invoice_entry'],
         },
       },
-      suggested_action: 'Verificar en cocina si hay stock físico no registrado. Notificar a meseros para desactivar platillos afectados.',
+      suggested_action: 'Verificar en cocina si hay stock físico no registrado. No desactives platillos automáticamente sin confirmar receta y existencia física.',
       confidence: 0.95,
       status: 'new',
       expires_at: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
