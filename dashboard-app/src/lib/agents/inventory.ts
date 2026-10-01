@@ -37,13 +37,100 @@ interface InventoryRow {
   updated_at: string | null
 }
 
+interface InventoryMovement {
+  created_at: string | null
+}
+
+interface MenuItem {
+  id: string
+}
+
+interface InventoryPolicy {
+  menu_item_id: string
+  inventory_mode: string | null
+}
+
+interface CanonicalRecipeLine {
+  menu_item_id: string
+}
+
 /** Más allá de esta ventana el stock es un registro histórico, no realidad física. */
 const STOCK_FRESHNESS_MS = 48 * 60 * 60 * 1000
+const CERTIFICATION_MENU_LIMIT = 2000
+const CERTIFICATION_RECIPE_LINE_LIMIT = 5000
 
 function freshAt(value: string | null | undefined, now: number): boolean {
   if (!value) return false
   const time = new Date(value).getTime()
   return Number.isFinite(time) && time <= now && now - time <= STOCK_FRESHNESS_MS
+}
+
+/**
+ * Antes de afirmar algo operativo de inventario comprobamos tres hechos independientes:
+ * una foto reciente del stock, un ledger reciente que la pueda explicar y una política
+ * completa de menú/receta. No inferimos ninguno a partir de los otros dos.
+ */
+async function inventoryIsCertified(
+  clientId: string,
+  sbGet: <T>(table: string, query: string) => Promise<T[]>,
+  now: number,
+): Promise<{ ok: boolean; evidence: Record<string, unknown> }> {
+  try {
+    const [movements, menu, policies, recipeLines] = await Promise.all([
+      sbGet<InventoryMovement>(
+        'pos_inventory_movements',
+        `client_id=eq.${encodeURIComponent(clientId)}&select=created_at&order=created_at.desc&limit=1`,
+      ),
+      sbGet<MenuItem>(
+        'pos_menu_items',
+        `client_id=eq.${encodeURIComponent(clientId)}&active=eq.true&select=id&limit=${CERTIFICATION_MENU_LIMIT}`,
+      ),
+      sbGet<InventoryPolicy>(
+        'pos_item_inventory_policy',
+        `client_id=eq.${encodeURIComponent(clientId)}&select=menu_item_id,inventory_mode&limit=${CERTIFICATION_MENU_LIMIT}`,
+      ),
+      sbGet<CanonicalRecipeLine>(
+        'pos_recipes_canonical',
+        `client_id=eq.${encodeURIComponent(clientId)}&select=menu_item_id&limit=${CERTIFICATION_RECIPE_LINE_LIMIT}`,
+      ),
+    ])
+
+    const latestMovement = movements[0]?.created_at ?? null
+    const activeMenuIds = new Set(menu.map(item => item.id))
+    const policyByMenuId = new Map(policies.map(policy => [policy.menu_item_id, policy.inventory_mode]))
+    const recipeMenuIds = new Set(recipeLines.map(line => line.menu_item_id))
+    const policyGaps = [...activeMenuIds].filter(id => !policyByMenuId.has(id) || policyByMenuId.get(id) === 'unclassified')
+    const recipeGaps = [...activeMenuIds].filter(id =>
+      policyByMenuId.get(id) === 'recipe' && !recipeMenuIds.has(id),
+    )
+    const ledgerFresh = freshAt(latestMovement, now)
+
+    // El límite de la API no puede interpretarse como cobertura completa. Ante una
+    // colección que lo alcanza, se requiere paginación/certificación dedicada.
+    const completeRead = menu.length < CERTIFICATION_MENU_LIMIT
+      && policies.length < CERTIFICATION_MENU_LIMIT
+      && recipeLines.length < CERTIFICATION_RECIPE_LINE_LIMIT
+
+    return {
+      ok: completeRead && ledgerFresh && policyGaps.length === 0 && recipeGaps.length === 0,
+      evidence: {
+        fuente_ledger: 'pos_inventory_movements',
+        ultima_actualizacion_ledger: latestMovement,
+        ledger_reciente: ledgerFresh,
+        menu_activo: activeMenuIds.size,
+        sin_politica_o_no_clasificados: policyGaps.length,
+        recetas_faltantes_para_politica_recipe: recipeGaps.length,
+        lectura_completa: completeRead,
+      },
+    }
+  } catch {
+    // Fallar cerrado: si no podemos leer una de las fuentes, no transformamos una foto
+    // parcial en una recomendación operativa.
+    return {
+      ok: false,
+      evidence: { fuentes_completas_disponibles: false },
+    }
+  }
 }
 
 export async function runInventoryAgent(
@@ -148,6 +235,24 @@ export async function runInventoryAgent(
   // operativas. Las obsoletas ya están representadas por el aviso anterior.
   products = fresh
   if (products.length === 0) return events
+
+  const certification = await inventoryIsCertified(clientId, sbGet, now)
+  if (!certification.ok) {
+    events.push({
+      client_id: clientId,
+      agent_id: 'inventory',
+      type: 'inventory_data_unverified',
+      severity: 'warning',
+      title: 'Inventario sin evidencia suficiente para alertas operativas',
+      explanation: 'El stock reciente no basta por sí solo: falta un ledger reciente o cobertura completa de política y receta. No se emiten faltantes, reorden ni recomendaciones de auto-86.',
+      evidence: certification.evidence,
+      suggested_action: 'Sincroniza movimientos y completa la política/recetas del menú antes de usar el inventario para decisiones de compra o disponibilidad.',
+      confidence: 0.99,
+      status: 'new',
+      expires_at: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+    })
+    return events
+  }
 
   // ── 1. Stock registrado en cero ──────────────────────────────────────────
   const outOfStock = products.filter(p => p.stock <= 0)
