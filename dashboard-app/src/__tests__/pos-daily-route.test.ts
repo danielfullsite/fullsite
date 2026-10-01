@@ -38,7 +38,8 @@ describe('GET /api/dashboard/pos-daily', () => {
     for (const [url] of fetchMock.mock.calls) {
       const p = new URL(url)
       expect(p.pathname).toBe('/rest/v1/pos_orders')
-      expect(p.searchParams.get('select')).toBe('*')
+      expect(p.searchParams.get('select')).toBe('id,dia_venta,mesa,mesero,personas,status,subtotal,iva,total,descuento,metodo_pago,items,pagos,propina,payment_status,turno_id,created_at,closed_at')
+      expect(p.searchParams.get('select')).not.toContain('comanda_batches')
       expect(p.searchParams.get('client_id')).toBe('eq.restaurant-a')
       expect(p.searchParams.get('location_id')).toBe('eq.branch-a')
       expect(p.searchParams.get('dia_venta')).toBe('gte.2026-08-01')

@@ -22,6 +22,16 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const PAGE = 1000
 const MAX_PAGES = 60 // 60k órdenes tope duro, evita un bucle infinito
 
+// Esta ruta alimenta un resumen, no una ficha de orden. Pedir `select=*`
+// arrastraba campos pesados que nunca usa el dashboard (por ejemplo los lotes
+// de comanda) en cada carga. Mantener la proyección explícita también evita
+// que una columna futura haga crecer silenciosamente el tiempo de arranque.
+const DASHBOARD_ORDER_COLUMNS = [
+  'id', 'dia_venta', 'mesa', 'mesero', 'personas', 'status',
+  'subtotal', 'iva', 'total', 'descuento', 'metodo_pago', 'items', 'pagos',
+  'propina', 'payment_status', 'turno_id', 'created_at', 'closed_at',
+].join(',')
+
 export async function GET(request: NextRequest) {
   if (!SB_KEY) {
     return NextResponse.json({ error: 'server misconfigured: SUPABASE_SERVICE_KEY required' }, { status: 503, headers: NO_STORE })
@@ -46,7 +56,7 @@ export async function GET(request: NextRequest) {
   try {
     for (let i = 0; i < MAX_PAGES; i++) {
       const params = new URLSearchParams({
-        select: '*',
+        select: DASHBOARD_ORDER_COLUMNS,
         client_id: `eq.${clientId}`,
         dia_venta: `gte.${since}`,
         order: 'id.asc',
