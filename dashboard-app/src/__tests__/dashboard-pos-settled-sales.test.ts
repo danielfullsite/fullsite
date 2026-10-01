@@ -78,11 +78,26 @@ describe('report source fallback', () => {
     expect((await getLatestDay('restaurant-a'))?.fecha).toBe('2026-09-08')
   })
   it('propagates unavailable when neither source provides confirmed data', async () => {
-    fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily')
+    // Sin sucursal el histórico va por /ocm-daily y el día por /pos-daily; si ambas
+    // fuentes vivas y wansoft fallan, se propaga el error (OCM_ o POS_), no una lista vacía.
+    fetchMock.mockImplementation(async (url: string) => (url.includes('/pos-daily') || url.includes('/ocm-daily'))
       ? new Response('', { status: 503 }) : Response.json([]))
-    await expect(getRecentDays(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
-    await expect(getLatestDay('restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
+    await expect(getRecentDays(30, 'restaurant-a')).rejects.toThrow(/UNAVAILABLE/)
+    await expect(getLatestDay('restaurant-a')).rejects.toThrow(/UNAVAILABLE/)
     await expect(getDateRange('2020-01-01', '2020-01-07', 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
+  })
+
+  it('sin sucursal, el histórico se lee de /ocm-daily (ligero), no de 90 días de pos_orders crudo', async () => {
+    const urls: string[] = []
+    fetchMock.mockImplementation(async (url: string) => {
+      urls.push(url)
+      if (url.includes('/ocm-daily')) return Response.json({ days: [{ fecha: '2026-09-30', ventas_dia: 49761, tickets_count: 73 }] })
+      return Response.json([])
+    })
+    const dias = await getRecentDays(30, 'restaurant-a')
+    expect(urls.some(u => u.includes('/ocm-daily')), 'debe consultar ocm-daily').toBe(true)
+    expect(urls.some(u => u.includes('/pos-daily')), 'NO debe jalar 90 días de pos crudo').toBe(false)
+    expect(dias.at(-1)?.ventas_dia).toBe(49761)
   })
   it('historical date ranges look back to the requested start, not merely the interval length', async () => {
     fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily') ? Response.json({ orders: [] }) : Response.json([]))
