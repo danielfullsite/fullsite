@@ -99,6 +99,21 @@ describe('report source fallback', () => {
     expect(urls.some(u => u.includes('/pos-daily')), 'NO debe jalar 90 días de pos crudo').toBe(false)
     expect(dias.at(-1)?.ventas_dia).toBe(49761)
   })
+  it('el histórico legado inicial no descarga los JSON pesados de cada día', async () => {
+    const urls: string[] = []
+    fetchMock.mockImplementation(async (url: string) => {
+      urls.push(url)
+      if (url.includes('/ocm-daily')) return Response.json({ days: [] })
+      return Response.json([{ fecha: '2026-09-30', ventas_dia: 49761, tickets_count: 73 }])
+    })
+    await getRecentDays(1000, 'restaurant-a')
+    const legacy = urls.find(url => url.includes('/rest/v1/wansoft_daily'))!
+    const select = new URL(legacy).searchParams.get('select')!
+    expect(select).toContain('ventas_dia')
+    expect(select).not.toContain('platillos_top')
+    expect(select).not.toContain('ventas_por_grupo')
+    expect(select).not.toContain('meseros')
+  })
   it('historical date ranges look back to the requested start, not merely the interval length', async () => {
     fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily') ? Response.json({ orders: [] }) : Response.json([]))
     await getDateRange('2020-01-01', '2020-01-07', 'restaurant-a')

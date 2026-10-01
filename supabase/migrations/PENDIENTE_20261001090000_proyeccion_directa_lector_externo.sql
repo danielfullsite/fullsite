@@ -71,7 +71,21 @@ begin
       loc.location_id,
       ht.fecha as dia_venta,
       ('wt-' || to_char(ht.fecha, 'YYYYMMDD'))::text as turno_id,
-      greatest(coalesce(ht.mesa, '0')::integer, 0) as mesa,
+      -- NetSilver expresa las cuentas sin mesa como números negativos (por
+      -- ejemplo, -1).  Nunca se deben convertir en una mesa física; se
+      -- normalizan a 0.  La conversión por numeric evita que un texto enorme
+      -- o no numérico invalide todo el lote de un lector externo.
+      greatest(
+        least(
+          case
+            when btrim(coalesce(ht.mesa, '')) ~ '^-?[0-9]+$'
+              then btrim(ht.mesa)::numeric
+            else 0
+          end,
+          2147483647
+        ),
+        0
+      )::integer as mesa,
       ht.mesero,
       case when ht.cancelado then 'cancelada' else 'cerrada' end as status,
       ht.total,

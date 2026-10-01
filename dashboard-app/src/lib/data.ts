@@ -6,6 +6,18 @@ import { fetchWithTimeout } from './fetch-with-timeout'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// El dashboard inicial necesita los acumulados por día. Los JSON de detalle
+// (meseros, platillos y categorías) pesan ~4 KB por día en AMALAY y antes se
+// descargaban para casi mil días aunque la pantalla sólo muestra agregados.
+// El día actual conserva su detalle vía `getLatestDay`; su fallback también
+// sigue leyendo la fila completa más reciente.
+const WANSOFT_DASHBOARD_SUMMARY_COLUMNS = [
+  'fecha', 'ventas_dia', 'ventas_brutas', 'descuentos', 'devoluciones',
+  'tickets_count', 'personas_restaurant', 'ticket_promedio_restaurant',
+  'efectivo', 'tarjeta', 'mesas_atendidas', 'ordenes_llevar',
+  'propinas_total', 'updated_at',
+].join(',')
+
 /** RLS: wansoft_daily/agent_runs are authenticated-only since rls_tighten_policies.sql.
  *  Use the logged-in session token as Bearer (anon key alone sees 0 rows).
  *  Token is cached for 30s to avoid 3s timeout on every single fetch. */
@@ -276,7 +288,7 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
     ? await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId).catch(error => { posError = error; return [] })
     : await getOcmDaily(clientSlug, Math.min(days, 90)).catch(error => { posError = error; return [] })
   // Then get wansoft_daily for historical data
-  const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
+  const data = await sbFetch('wansoft_daily', `select=${WANSOFT_DASHBOARD_SUMMARY_COLUMNS}&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
   if (posError && !wansoftData.length) throw posError
   // Merge: for dates that exist in both, prefer pos_orders (live POS data)
