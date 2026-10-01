@@ -8,7 +8,7 @@ import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, Fi
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getDashboardOperationStatus, type TurnoAbierto } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getDashboardOperationStatus, getDashboardIntradayRhythm, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
 import { canShowFinalProjection, dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
@@ -17,7 +17,8 @@ import QuienVendio from '@/components/dashboard/QuienVendio'
 import RitmoSemana from '@/components/dashboard/RitmoSemana'
 import EnVista from '@/components/ui/EnVista'
 import CentroAgentes from '@/components/agentes/CentroAgentes'
-import { detectar } from '@/lib/agentes/detectar'
+import { detectar, detectarRitmoIntraDia } from '@/lib/agentes/detectar'
+import type { IntradayRhythm } from '@/lib/intraday-rhythm'
 import ListaAtencion from '@/components/dashboard/ListaAtencion'
 import { formatCurrency, formatPercent, formatDate, percentChange } from '@/lib/format'
 import PredictionWidget from '@/components/PredictionWidget'
@@ -161,21 +162,29 @@ export default function DashboardPage() {
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
   const [estadoOperacion, setEstadoOperacion] = useState<DashboardOperationStatus | null>(null)
+  const [ritmoIntraDia, setRitmoIntraDia] = useState<IntradayRhythm | null>(null)
 
   useEffect(() => {
     if (!clientId) return
     let vivo = true
-    Promise.all([
-      getDeteccionesAgentes().catch(() => []),
+    // El estado de Caja y el corte horario cambian durante el turno. Se vuelven
+    // a leer junto con el dashboard; no se congela el "a esta hora" inicial.
+    const refreshOperacion = () => Promise.all([
       getDashboardOperationStatus(clientId).catch(() => null),
-    ]).then(([eventos, estado]) => {
+      getDashboardIntradayRhythm(clientId).catch(() => null),
+    ]).then(([estado, ritmo]) => {
       if (!vivo) return
-      setAtencion(desdeEventos(eventos))
       setEstadoOperacion(estado)
       setTurnoAbierto(estado?.turnoAbierto ?? null)
       setCargandoTurno(false)
+      setRitmoIntraDia(ritmo)
     })
-    return () => { vivo = false }
+    getDeteccionesAgentes().catch(() => []).then(eventos => {
+      if (vivo) setAtencion(desdeEventos(eventos))
+    })
+    void refreshOperacion()
+    const interval = window.setInterval(() => { void refreshOperacion() }, 5 * 60 * 1000)
+    return () => { vivo = false; window.clearInterval(interval) }
   }, [clientId])
 
   // Load widget config from localStorage
@@ -427,7 +436,13 @@ export default function DashboardPage() {
     latestDay ? String(latestDay.fecha).slice(0, 10) : null,
     estadoOperacion,
   )
-  const detecciones = detectar(recentData, viewDay, { diaAbierto })
+  const deteccionesFinales = detectar(recentData, viewDay, { diaAbierto })
+  // El contrato de ritmo sólo se incorpora mientras se muestra el día que Caja
+  // mantiene abierto. Si falta muestra horaria, no sustituye el silencio seguro.
+  const deteccionIntraDia = diaAbierto && selectedDayIdx === 0
+    ? detectarRitmoIntraDia(ritmoIntraDia)
+    : null
+  const detecciones = deteccionIntraDia ? [deteccionIntraDia, ...deteccionesFinales] : deteccionesFinales
 
   // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
   // no hay una consulta nueva. El patrón más fuerte de una cafetería es el día

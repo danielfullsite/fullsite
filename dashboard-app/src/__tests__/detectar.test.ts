@@ -6,7 +6,7 @@
 // Los datos de los casos son los reales de Espresso Lab, medidos contra
 // pos_orders: 627 órdenes cerradas entre el 24-jun y el 24-jul de 2026.
 import { describe, it, expect } from 'vitest'
-import { detectar, saludo, MUESTRA_MINIMA } from '@/lib/agentes/detectar'
+import { detectar, detectarRitmoIntraDia, saludo, MUESTRA_MINIMA } from '@/lib/agentes/detectar'
 import type { WansoftDaily } from '@/lib/types'
 
 function dia(o: Partial<WansoftDaily> & { fecha: string }): WansoftDaily {
@@ -119,6 +119,27 @@ describe('detectar — la venta contra sus mismos días', () => {
   it('un día histórico confirmado como cerrado conserva su comparación', () => {
     const cerradas = detectar([...VIERNES, EL_24], EL_24, { diaAbierto: false })
     expect(cerradas.some(d => d.id.startsWith('venta-vs-dia'))).toBe(true)
+  })
+})
+
+describe('detectarRitmoIntraDia — nunca declara un cierre', () => {
+  it('dice ritmo al corte, sin pérdida final ni proyección', () => {
+    const d = detectarRitmoIntraDia({
+      businessDate: '2026-10-01', cutOffMinutes: 630, cutOffTime: '15:30',
+      currentTotal: 100, expectedTotal: 200, comparableDays: 2,
+    })!
+    const texto = [d.linea, d.pushCuerpo, d.evidenciaNota, d.recomendacion].join(' ').toLowerCase()
+    expect(texto).toContain('a esta hora')
+    expect(texto).toContain('15:30')
+    expect(texto).not.toMatch(/cerró|faltaron|proyecci[oó]n/)
+    expect(d.impacto).toBeNull()
+  })
+
+  it('se calla sin muestra equivalente suficiente', () => {
+    expect(detectarRitmoIntraDia({
+      businessDate: '2026-10-01', cutOffMinutes: 630, cutOffTime: '15:30',
+      currentTotal: 100, expectedTotal: 200, comparableDays: 1,
+    })).toBeNull()
   })
 })
 
