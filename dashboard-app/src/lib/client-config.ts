@@ -35,6 +35,10 @@ export interface ClientConfig {
   meseros: string[]
   features: ClientFeatures
   iva_rate: number
+  /** ¿El precio de la carta YA trae el impuesto? Por omisión false = se suma
+   *  encima, que es como se comportaba el sistema antes de que existiera esta
+   *  bandera. Ver `pos-constants.ts:preciosIncluyenIva`. */
+  precios_incluyen_iva: boolean
   data_source: 'supabase' | 'demo' | 'wansoft' | 'fullsite'
   logo_url?: string
   // Wansoft integration
@@ -140,6 +144,9 @@ export async function fetchClientConfig(clientId: string): Promise<ClientConfig>
           // convierte explícitamente — si no, "0" es truthy y el `??` no bastaría
           // para detectar el problema, pero el número quedaría como texto.
           iva_rate: row.iva_rate == null ? 0.16 : Number(row.iva_rate),
+          // `=== true` y no truthy: una columna que todavía no existe llega como
+          // undefined, y eso tiene que significar «modo de hoy», no «enciéndelo».
+          precios_incluyen_iva: row.precios_incluyen_iva === true,
           data_source: row.data_source || 'supabase',
           logo_url: row.logo_url,
           wansoft_subsidiary_id: row.wansoft_subsidiary_id,
@@ -203,6 +210,7 @@ function getClientConfigFallback(clientId: string): ClientConfig {
     meseros: fb.meseros || [],
     features: fb.features || DEFAULT_FEATURES,
     iva_rate: 0.16,
+    precios_incluyen_iva: false,
     data_source: fb.data_source || 'supabase',
     ...fb,
   }

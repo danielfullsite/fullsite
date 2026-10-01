@@ -133,28 +133,43 @@ async function resolveTurnoForSave(
  * orden, y este camino corre al cerrar cada cuenta. Devuelve `null` si no se puede resolver;
  * el llamador entonces NO audita (ver el comentario de la detección).
  */
-const _ivaRateCache = new Map<string, number>()
+type RegimenFiscal = { rate: number; incluido: boolean }
+const _ivaRateCache = new Map<string, RegimenFiscal>()
+
+/**
+ * La tasa Y el modo, juntos: de nada sirve una sin el otro.
+ *
+ * Con `incluido: true` el precio de carta YA trae el impuesto, así que el total
+ * esperado es la base, no la base más la tasa. Auditar un restaurante inclusivo
+ * con la fórmula exclusiva acusaría de un faltante del 16% a CADA cuenta cerrada
+ * — es exactamente el envenenamiento por falso positivo que este archivo ya
+ * documenta («el falso positivo del IVA de agosto: quince eventos, todos falsos,
+ * que taparon el caso real»).
+ */
 async function ivaRateFor(
   clientId: string,
   sbUrl: string,
   headers: Record<string, string>,
-): Promise<number | null> {
+): Promise<RegimenFiscal | null> {
   const cached = _ivaRateCache.get(clientId)
   if (cached !== undefined) return cached
   try {
     const res = await fetch(
-      `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=iva_rate&limit=1`,
+      `${sbUrl}/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}&select=iva_rate,precios_incluyen_iva&limit=1`,
       { headers },
     )
     if (!res.ok) return null
     // PostgREST devuelve numeric como STRING — de ahí el Number().
-    const rows = await res.json() as Array<{ iva_rate?: number | string | null }>
+    const rows = await res.json() as Array<{ iva_rate?: number | string | null; precios_incluyen_iva?: boolean | null }>
     const raw = rows?.[0]?.iva_rate
     if (raw === undefined || raw === null) return null
     const rate = Number(raw)
     if (!Number.isFinite(rate) || rate < 0 || rate > 1) return null
-    _ivaRateCache.set(clientId, rate)
-    return rate
+    // `=== true`: una columna que todavía no existe llega undefined, y eso tiene
+    // que significar el modo de hoy, no encender el nuevo.
+    const regimen = { rate, incluido: rows[0]?.precios_incluyen_iva === true }
+    _ivaRateCache.set(clientId, regimen)
+    return regimen
   } catch {
     return null
   }
@@ -179,9 +194,10 @@ async function auditarCierreContraLaFila(o: {
   rolSolicitante?: string
 }): Promise<void> {
   try {
-    const ivaRate = await ivaRateFor(o.clientId, o.sbUrl, o.headers)
-    // Sin tasa resoluble no se audita: preferimos no reportar a reportar de más.
-    if (ivaRate === null) return
+    const regimen = await ivaRateFor(o.clientId, o.sbUrl, o.headers)
+    // Sin régimen resoluble no se audita: preferimos no reportar a reportar de más.
+    if (regimen === null) return
+    const ivaRate = regimen.rate
 
     const res = await fetch(
       `${o.sbUrl}/rest/v1/pos_orders?id=eq.${encodeURIComponent(o.orderId)}` +
@@ -223,7 +239,12 @@ async function auditarCierreContraLaFila(o: {
       .reduce((s, it) => s + cents(it?.subtotal ?? 0), 0)
     const descuento = cents(fila.descuento ?? 0)
     const base = sumItems - descuento
-    const expectedTotal = base + Math.round(base * ivaRate)
+    // Con precio inclusivo el total esperado ES la base: el impuesto ya viene
+    // dentro de cada renglón y sumarlo otra vez fabricaría un faltante del 16%
+    // en cada cuenta, contra un mesero que no hizo nada.
+    const expectedTotal = regimen.incluido && ivaRate > 0
+      ? base
+      : base + Math.round(base * ivaRate)
 
     // LA MESA DIVIDIDA SE MIDE CONTRA LO QUE COBRARON SUS CUENTAS, no contra su propia
     // fila: la madre queda con el total de la mesa pero NO cobró nada — el dinero entró
