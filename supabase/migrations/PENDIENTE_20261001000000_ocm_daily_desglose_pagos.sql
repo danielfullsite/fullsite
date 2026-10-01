@@ -32,7 +32,7 @@
 --     la propina está sólo en la transferencia, en 0 sólo en la tarjeta y en 8 en ambas.
 --     Restar la propina de la tarjeta "porque cabe" habría estado mal en 10 de 18.
 --
--- REGLA (fs_desglose_pago): sólo reparte lo que es demostrable con los datos de la fila
+-- REGLA (fs_desglose_pago_v2): sólo reparte lo que es demostrable con los datos de la fila
 -- ---------------------------------------------------------------------------------------
 -- Clases de pago por nombre: efectivo (efec, sin tarj), tarjeta (tarj, sin efec), otros (todo
 -- lo demás: transferencia, apps, "Dólares", "American Express", NetPay, etc.).
@@ -49,17 +49,21 @@
 --                                          con propina, efectivo+tarjeta con E > 0 y P > 0,
 --                                          y subcobro con propina. La propina y el cambio no
 --                                          se asignan a ninguna clase por descarte.
--- Sin pagos (nulo, no-array o arreglo vacío):
---   * metodo_pago declarado con una sola clase: el ticket va a esa clase ("declarado": es el
---     único dato disponible, no un detalle verificado);
---   * metodo_pago nulo, vacío o con efectivo Y tarjeta: no_determinado = T.
--- Con pagos pero inválidos (monto no numérico o negativo, suma 0): no_determinado = T; no se
--- confía en metodo_pago cuando el detalle existe y está corrupto.
+-- Sin pagos detallados (nulo, no-array o vacío) o con pagos corruptos (monto no numérico o
+-- negativo, suma 0): no_determinado = T. `metodo_pago` YA NO se usa: un método declarado sin
+-- detalle de pagos no es un dato demostrado y no alimenta efectivo/tarjeta. (La v1 lo mandaba a
+-- una clase como "declarado"; se retiró el 2026-10-01 por decisión de Daniel.) Efecto visible:
+-- tenants que sólo guardan metodo_pago sin pagos (scyf-demo, boruca, chickin-demo, 5 tickets de
+-- AMALAY) muestran su venta en no_determinado en vez de efectivo/tarjeta/otros.
+-- Centavos: total, propina y cada monto se redondean a 2 decimales ANTES de clasificar; las
+-- comparaciones son exactas (sin tolerancia). El residuo de fracción de centavo del total
+-- original, si lo hubiera, queda explícito en no_determinado (el ticket sólo se cuenta en
+-- tickets_no_determinado si ese residuo llega a >= 0.005).
 -- En todos los casos efectivo + tarjeta + otros_medios + no_determinado = total (por ticket y
 -- por día). `excedente_pagos` = max(S - T, 0) = propina incluida + cambio, SIN repartir entre
 -- ambos; la propina sigue en `propinas_total` (Σ pos_orders.propina) y no se mezcla en ventas.
 --
--- Este diseño no necesita saber si el tenant es espejo o nativo: usa sólo los casos en los que
+-- Este diseño no necesita saber si el tenant es espejo o nativo (ni mira metodo_pago): usa sólo los casos en los que
 -- el reparto es el mismo bajo cualquier semántica. El costo es que los tickets mixtos con
 -- propina y excedente quedan "no determinado" hasta que la fuente traiga la propina por pago.
 -- Cómo resolverlos (NO incluido; requiere autorización): (a) que el sync copie
@@ -82,7 +86,7 @@
 --
 -- ALCANCE (un P0 por PR)
 -- ----------------------
--- Cambia: función public.fs_desglose_pago y vista public.ocm_daily.
+-- Cambia: función nueva public.fs_desglose_pago_v2 y vista public.ocm_daily.
 -- NO cambia (después de revisar esta regla común): public.fs_ventas_diarias,
 -- dashboard-app/src/lib/pos-daily.ts y las pantallas POS. Mientras tanto esas rutas siguen
 -- con la regla anterior y pueden contradecir a esta vista.
@@ -91,14 +95,37 @@
 -- --------------
 -- Ejecutar el bloque "DEFINICIÓN ANTERIOR" del final (restaura la vista; al quitar las 4
 -- columnas hace falta DROP VIEW + CREATE VIEW, ya incluido) y DROP FUNCTION
--- public.fs_desglose_pago(numeric, numeric, jsonb, text). No se migran ni reescriben tablas.
+-- public.fs_desglose_pago_v2(numeric, numeric, jsonb). No se migran ni reescriben tablas.
 -- Permisos: CREATE OR REPLACE conserva ACL; el DROP/CREATE de la reversa los pierde, por eso
 -- el bloque los restaura (GRANT idénticos a producción al 2026-10-01).
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.fs_desglose_pago(
-  p_total numeric, p_propina numeric, p_pagos jsonb, p_metodo_pago text
+-- PREFLIGHT (falla cerrado, sin cambiar nada): la vista debe tener exactamente las 14 columnas
+-- de hoy (primera aplicación) o las 18 de esta migración (reaplicación). Cualquier otra forma
+-- significa que otra migración la cambió y esta definición la pisaría.
+DO $pre$
+DECLARE cols text;
+BEGIN
+  SELECT string_agg(attname, ',' ORDER BY attnum) INTO cols
+    FROM pg_attribute WHERE attrelid = 'public.ocm_daily'::regclass AND attnum > 0 AND NOT attisdropped;
+  IF cols IS NULL THEN
+    RAISE EXCEPTION 'preflight: public.ocm_daily no existe';
+  END IF;
+  IF cols NOT IN (
+    'client_id,fecha,source_system,ventas_dia,ventas_brutas,descuentos,efectivo,tarjeta,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant,propinas_total,generated_at',
+    'client_id,fecha,source_system,ventas_dia,ventas_brutas,descuentos,efectivo,tarjeta,tickets_count,mesas_atendidas,personas_restaurant,ticket_promedio_restaurant,propinas_total,generated_at,otros_medios,no_determinado,excedente_pagos,tickets_no_determinado') THEN
+    RAISE EXCEPTION 'preflight: columnas inesperadas en public.ocm_daily (%). No se aplica.', cols;
+  END IF;
+END
+$pre$;
+
+-- La función se llama _v2 y tiene firma propia (3 argumentos, 5 columnas): no choca con ninguna
+-- versión anterior de fs_desglose_pago (en producción no existe ninguna, medido 2026-10-01) y
+-- CREATE OR REPLACE nunca necesita cambiar un tipo de retorno. Si algún entorno ya tuviera una
+-- fs_desglose_pago de otra forma, queda intacta.
+CREATE OR REPLACE FUNCTION public.fs_desglose_pago_v2(
+  p_total numeric, p_propina numeric, p_pagos jsonb
 )
 RETURNS TABLE(efectivo numeric, tarjeta numeric, otros_medios numeric,
               no_determinado numeric, excedente_pagos numeric)
@@ -108,12 +135,13 @@ PARALLEL SAFE
 SET search_path = pg_catalog, public
 AS $fn$
   WITH base AS (
-    SELECT COALESCE(p_total, 0) AS total,
-           COALESCE(p_propina, 0) AS propina,
-           CASE WHEN jsonb_typeof(p_pagos) = 'array' THEN p_pagos ELSE '[]'::jsonb END AS pagos,
-           COALESCE(btrim(p_metodo_pago), '') AS metodo
+    -- Se normaliza a centavos ANTES de clasificar: total, propina y cada monto.
+    SELECT COALESCE(p_total, 0) AS total_raw,
+           round(COALESCE(p_total, 0), 2) AS total,
+           round(COALESCE(p_propina, 0), 2) AS propina,
+           CASE WHEN jsonb_typeof(p_pagos) = 'array' THEN p_pagos ELSE '[]'::jsonb END AS pagos
   ), a AS (
-    SELECT b.total, b.propina, b.metodo,
+    SELECT b.total_raw, b.total, b.propina,
            count(q.e) AS n_el,
            count(q.v) FILTER (WHERE q.v >= 0) AS n_ok,
            COALESCE(sum(q.v), 0) AS suma,
@@ -126,10 +154,10 @@ AS $fn$
         SELECT e,
                COALESCE(e->>'metodo', '') AS me,
                CASE WHEN jsonb_typeof(e->'monto') IN ('number','string')
-                     AND (e->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (e->>'monto')::numeric END AS v
+                     AND (e->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN round((e->>'monto')::numeric, 2) END AS v
           FROM jsonb_array_elements(b.pagos) e
       ) q ON true
-     GROUP BY b.total, b.propina, b.metodo
+     GROUP BY b.total_raw, b.total, b.propina
   ), c AS (
     SELECT a.*,
            (a.n_el > 0 AND a.n_el = a.n_ok AND a.suma > 0) AS valido,
@@ -140,52 +168,43 @@ AS $fn$
   ), d AS (
     SELECT c.*,
            CASE
-             WHEN c.n_el = 0 THEN 'declarado'
-             WHEN NOT c.valido THEN 'nd'
-             WHEN c.exceso <= 0.005 AND c.falta <= 0.005 THEN 'monto'
-             WHEN c.exceso > 0.005 AND c.clases = 1 THEN 'unica'
-             WHEN c.exceso > 0.005 AND c.propina <= 0.005 AND c.cash >= c.exceso - 0.005 THEN 'cambio'
-             WHEN c.falta > 0.005 AND c.propina <= 0.005 THEN 'falta'
+             WHEN NOT c.valido THEN 'nd'          -- sin pagos detallados o pagos corruptos
+             WHEN c.exceso = 0 AND c.falta = 0 THEN 'monto'
+             WHEN c.exceso > 0 AND c.clases = 1 THEN 'unica'
+             WHEN c.exceso > 0 AND c.propina = 0 AND c.cash >= c.exceso THEN 'cambio'
+             WHEN c.falta > 0 AND c.propina = 0 THEN 'falta'
              ELSE 'nd'
            END AS modo
       FROM c
+  ), e AS (
+    SELECT d.*,
+           -- venta ya clasificada (con montos en centavos) según el modo
+           CASE d.modo WHEN 'monto' THEN d.suma WHEN 'unica' THEN d.total
+                       WHEN 'cambio' THEN d.total WHEN 'falta' THEN d.suma
+                       ELSE 0::numeric END AS clasificado
+      FROM d
   )
   SELECT
-    CASE d.modo
-      WHEN 'declarado' THEN CASE WHEN d.metodo ~* 'efec' AND d.metodo !~* 'tarj' THEN d.total ELSE 0::numeric END
-      WHEN 'unica'     THEN CASE WHEN d.cash > 0 THEN d.total ELSE 0::numeric END
-      WHEN 'cambio'    THEN d.cash - d.exceso
-      WHEN 'monto'     THEN d.cash
-      WHEN 'falta'     THEN d.cash
-      ELSE 0::numeric END,
-    CASE d.modo
-      WHEN 'declarado' THEN CASE WHEN d.metodo ~* 'tarj' AND d.metodo !~* 'efec' THEN d.total ELSE 0::numeric END
-      WHEN 'unica'     THEN CASE WHEN d.card > 0 THEN d.total ELSE 0::numeric END
-      WHEN 'cambio'    THEN d.card
-      WHEN 'monto'     THEN d.card
-      WHEN 'falta'     THEN d.card
-      ELSE 0::numeric END,
-    CASE d.modo
-      WHEN 'declarado' THEN CASE WHEN d.metodo <> '' AND NOT (d.metodo ~* 'efec' OR d.metodo ~* 'tarj') THEN d.total ELSE 0::numeric END
-      WHEN 'unica'     THEN CASE WHEN d.otros > 0 THEN d.total ELSE 0::numeric END
-      WHEN 'cambio'    THEN d.otros
-      WHEN 'monto'     THEN d.otros
-      WHEN 'falta'     THEN d.otros
-      ELSE 0::numeric END,
-    d.total - (
-      CASE d.modo
-        WHEN 'declarado' THEN CASE WHEN d.metodo <> '' AND NOT (d.metodo ~* 'efec' AND d.metodo ~* 'tarj') THEN d.total ELSE 0::numeric END
-        WHEN 'unica'     THEN d.total
-        WHEN 'cambio'    THEN d.suma - d.exceso
-        WHEN 'monto'     THEN d.suma
-        WHEN 'falta'     THEN d.suma
-        ELSE 0::numeric END),
-    CASE WHEN d.valido THEN d.exceso ELSE 0::numeric END
-  FROM d
+    CASE e.modo WHEN 'unica' THEN CASE WHEN e.cash > 0 THEN e.total ELSE 0::numeric END
+                WHEN 'cambio' THEN e.cash - e.exceso
+                WHEN 'monto' THEN e.cash WHEN 'falta' THEN e.cash
+                ELSE 0::numeric END,
+    CASE e.modo WHEN 'unica' THEN CASE WHEN e.card > 0 THEN e.total ELSE 0::numeric END
+                WHEN 'cambio' THEN e.card
+                WHEN 'monto' THEN e.card WHEN 'falta' THEN e.card
+                ELSE 0::numeric END,
+    CASE e.modo WHEN 'unica' THEN CASE WHEN e.otros > 0 THEN e.total ELSE 0::numeric END
+                WHEN 'cambio' THEN e.otros
+                WHEN 'monto' THEN e.otros WHEN 'falta' THEN e.otros
+                ELSE 0::numeric END,
+    -- residuo explícito: lo no clasificado + cualquier fracción de centavo del total original
+    e.total_raw - e.clasificado,
+    CASE WHEN e.valido THEN e.exceso ELSE 0::numeric END
+  FROM e
 $fn$;
 
-COMMENT ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text) IS
-  'Reparte la venta de un ticket entre efectivo, tarjeta y otros medios sólo cuando es demostrable con sus pagos; el resto queda en no_determinado (efectivo+tarjeta+otros+no_determinado = total). excedente_pagos = propina incluida + cambio sin repartir. No asume semántica bruta/neta del monto.';
+COMMENT ON FUNCTION public.fs_desglose_pago_v2(numeric, numeric, jsonb) IS
+  'Reparte la venta de un ticket entre efectivo, tarjeta y otros medios sólo cuando es demostrable con sus pagos (normalizados a centavos); el resto queda en no_determinado, que absorbe también el residuo sub-centavo (efectivo+tarjeta+otros+no_determinado = total exacto). Sin pagos detallados = no_determinado: no usa metodo_pago. excedente_pagos = propina incluida + cambio sin repartir. No asume semántica bruta/neta del monto.';
 
 CREATE OR REPLACE VIEW public.ocm_daily AS
  WITH live AS NOT MATERIALIZED (
@@ -206,9 +225,9 @@ CREATE OR REPLACE VIEW public.ocm_daily AS
             sum(dp.otros_medios) AS otros_medios,
             sum(dp.no_determinado) AS no_determinado,
             sum(dp.excedente_pagos) AS excedente_pagos,
-            (count(*) FILTER (WHERE dp.no_determinado <> 0))::integer AS tickets_no_determinado
+            (count(*) FILTER (WHERE abs(dp.no_determinado) >= 0.005))::integer AS tickets_no_determinado
            FROM pos_orders o
-             CROSS JOIN LATERAL public.fs_desglose_pago(o.total, o.propina, o.pagos, o.metodo_pago) dp
+             CROSS JOIN LATERAL public.fs_desglose_pago_v2(o.total, o.propina, o.pagos) dp
           WHERE o.status = ANY (ARRAY['cerrada'::text, 'completada'::text])
           GROUP BY o.client_id, ((o.created_at AT TIME ZONE 'America/Monterrey'::text)::date)
         ), hist AS (
@@ -276,8 +295,8 @@ UNION ALL
 -- La vista es security_invoker: quien la consulta ejecuta la función con SUS privilegios. Se
 -- limita a los roles que ya pueden leer ocm_daily (anon no puede leerla, así que no necesita
 -- la función). Es pura (IMMUTABLE, sin acceso a tablas): no abre datos a nadie.
-REVOKE ALL ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text)
+REVOKE ALL ON FUNCTION public.fs_desglose_pago_v2(numeric, numeric, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fs_desglose_pago_v2(numeric, numeric, jsonb)
   TO authenticated, service_role, fullsite_readonly, fullsite_agent;
 
 -- CREATE OR REPLACE conserva opciones y permisos; se reafirma lo que ya tiene producción.
@@ -288,8 +307,9 @@ COMMIT;
 -- ─────────────────────────────────────────────────────────────────────────────
 -- DEFINICIÓN ANTERIOR (reversa). Leída de producción con pg_get_viewdef el 2026-10-01.
 -- Difieren: `efectivo`/`tarjeta` de la CTE `live` y su FROM, y las 4 columnas nuevas. Quitar
--- columnas exige DROP VIEW (la vista no tiene dependientes ni funciones que la nombren,
--- medido el 2026-10-01); por eso se restauran los GRANT exactos de producción.
+-- columnas exige DROP VIEW (sin CASCADE a propósito: si alguien creó una vista dependiente, la
+-- reversa ABORTA sin cambiar nada; medido el 2026-10-01: ninguna dependiente ni función que la
+-- nombre). Se restauran los GRANT exactos de producción.
 -- ─────────────────────────────────────────────────────────────────────────────
 -- BEGIN;
 -- DROP VIEW public.ocm_daily;
@@ -377,5 +397,5 @@ COMMIT;
 -- GRANT ALL ON public.ocm_daily TO authenticated, service_role;
 -- GRANT INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON public.ocm_daily TO anon;
 -- GRANT SELECT ON public.ocm_daily TO fullsite_readonly, fullsite_agent;
--- DROP FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text);
+-- DROP FUNCTION public.fs_desglose_pago_v2(numeric, numeric, jsonb);
 -- COMMIT;

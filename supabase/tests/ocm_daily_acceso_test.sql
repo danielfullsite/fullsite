@@ -12,7 +12,7 @@
 --   * fullsite_readonly / fullsite_agent tienen SELECT de tabla y SIN política: ven 0 filas
 --     (hallazgo a revisar: si se esperaba que leyeran datos, hoy no leen nada);
 --   * security_invoker: la vista no ve más que la tabla para el mismo rol;
---   * función fs_desglose_pago: pura, no SECURITY DEFINER, ejecutable sólo por los roles que
+--   * función fs_desglose_pago_v2: pura, no SECURITY DEFINER, ejecutable sólo por los roles que
 --     ya leen la vista (anon revocado);
 --   * las concesiones de escritura de anon/authenticated sobre la vista no permiten escribir
 --     (la vista no es actualizable) y no cambian con la migración.
@@ -60,7 +60,7 @@ DECLARE
   q_b_hist constant text := $q$SELECT count(*) FROM public.ocm_daily WHERE client_id = 'tst-acc-b' AND source_system = 'wansoft'$q$;
   q_tab   constant text := $q$SELECT count(*) FROM public.pos_orders WHERE client_id LIKE 'tst-acc-%'$q$;
   q_ops   constant text := $q$SELECT count(*) FROM public.ops_daily WHERE client_id LIKE 'tst-acc-%'$q$;
-  q_fn    constant text := $q$SELECT count(*) FROM public.fs_desglose_pago(100,0,'[]'::jsonb,'Efectivo')$q$;
+  q_fn    constant text := $q$SELECT count(*) FROM public.fs_desglose_pago_v2(100,0,'[]'::jsonb)$q$;
 BEGIN
   -- Aislamiento authenticated
   r := pg_temp.leer('authenticated', ua, q_todo); RETURN QUERY SELECT 'authenticated A: ve sólo lo de A (live + histórico)', 'filas:2', r, r='filas:2';
@@ -77,7 +77,7 @@ BEGIN
   r := pg_temp.leer('anon', NULL, q_ops);  RETURN QUERY SELECT 'anon: sin SELECT en ops_daily', 'DENEGADO:42501', r, r='DENEGADO:42501';
   r := pg_temp.leer('anon', NULL, q_tab);  RETURN QUERY SELECT 'anon: SELECT de tabla en pos_orders pero RLS sin política = 0 filas', 'filas:0', r, r='filas:0';
   r := pg_temp.leer('anon', ua, q_tab);    RETURN QUERY SELECT 'anon con claims de A: sigue sin filas (el claim no cambia el rol)', 'filas:0', r, r='filas:0';
-  r := pg_temp.leer('anon', NULL, q_fn);   RETURN QUERY SELECT 'anon: sin EXECUTE en fs_desglose_pago', 'DENEGADO:42501', r, r='DENEGADO:42501';
+  r := pg_temp.leer('anon', NULL, q_fn);   RETURN QUERY SELECT 'anon: sin EXECUTE en fs_desglose_pago_v2', 'DENEGADO:42501', r, r='DENEGADO:42501';
   r := pg_temp.leer('anon', NULL, $q$INSERT INTO public.ocm_daily (client_id) VALUES ('tst-acc-a')$q$);
   RETURN QUERY SELECT 'anon: INSERT en la vista falla (vista no actualizable)', 'DENEGADO', substr(r,1,8), substr(r,1,8)='DENEGADO';
   r := pg_temp.leer('authenticated', ua, $q$DELETE FROM public.ocm_daily WHERE client_id='tst-acc-a'$q$);
@@ -89,17 +89,17 @@ BEGIN
   -- service_role
   r := pg_temp.leer('service_role', NULL, q_todo); RETURN QUERY SELECT 'service_role: ve ambos tenants (BYPASSRLS)', 'filas:4', r, r='filas:4';
   -- función ejecutable por quien lee la vista
-  r := pg_temp.leer('authenticated', ua, q_fn);       RETURN QUERY SELECT 'authenticated: EXECUTE en fs_desglose_pago', 'filas:1', r, r='filas:1';
-  r := pg_temp.leer('fullsite_readonly', NULL, q_fn); RETURN QUERY SELECT 'fullsite_readonly: EXECUTE en fs_desglose_pago', 'filas:1', r, r='filas:1';
-  r := pg_temp.leer('service_role', NULL, q_fn);      RETURN QUERY SELECT 'service_role: EXECUTE en fs_desglose_pago', 'filas:1', r, r='filas:1';
+  r := pg_temp.leer('authenticated', ua, q_fn);       RETURN QUERY SELECT 'authenticated: EXECUTE en fs_desglose_pago_v2', 'filas:1', r, r='filas:1';
+  r := pg_temp.leer('fullsite_readonly', NULL, q_fn); RETURN QUERY SELECT 'fullsite_readonly: EXECUTE en fs_desglose_pago_v2', 'filas:1', r, r='filas:1';
+  r := pg_temp.leer('service_role', NULL, q_fn);      RETURN QUERY SELECT 'service_role: EXECUTE en fs_desglose_pago_v2', 'filas:1', r, r='filas:1';
   -- Atributos de la función y la vista
-  RETURN QUERY SELECT 'fs_desglose_pago: no SECURITY DEFINER, IMMUTABLE, search_path fijo', 'f/i/pg_catalog, public',
+  RETURN QUERY SELECT 'fs_desglose_pago_v2: no SECURITY DEFINER, IMMUTABLE, search_path fijo', 'f/i/pg_catalog, public',
     (SELECT p.prosecdef::text||'/'||p.provolatile::text||'/'||coalesce(p.proconfig::text,'∅')
-       FROM pg_proc p WHERE p.oid='public.fs_desglose_pago(numeric,numeric,jsonb,text)'::regprocedure),
+       FROM pg_proc p WHERE p.oid='public.fs_desglose_pago_v2(numeric,numeric,jsonb)'::regprocedure),
     (SELECT NOT p.prosecdef AND p.provolatile='i' AND p.proconfig::text LIKE '%search_path=pg_catalog, public%'
-       FROM pg_proc p WHERE p.oid='public.fs_desglose_pago(numeric,numeric,jsonb,text)'::regprocedure);
-  RETURN QUERY SELECT 'fs_desglose_pago: el cuerpo no nombra tablas', 'sin tablas',
-    'comprobado', (SELECT p.prosrc !~* '(pos_orders|ops_daily|client_users|historico_)' FROM pg_proc p WHERE p.oid='public.fs_desglose_pago(numeric,numeric,jsonb,text)'::regprocedure);
+       FROM pg_proc p WHERE p.oid='public.fs_desglose_pago_v2(numeric,numeric,jsonb)'::regprocedure);
+  RETURN QUERY SELECT 'fs_desglose_pago_v2: el cuerpo no nombra tablas', 'sin tablas',
+    'comprobado', (SELECT p.prosrc !~* '(pos_orders|ops_daily|client_users|historico_)' FROM pg_proc p WHERE p.oid='public.fs_desglose_pago_v2(numeric,numeric,jsonb)'::regprocedure);
   RETURN QUERY SELECT 'ocm_daily conserva security_invoker=on', 'security_invoker=on',
     (SELECT coalesce(array_to_string(reloptions, ','),'∅') FROM pg_class WHERE oid='public.ocm_daily'::regclass),
     (SELECT reloptions::text LIKE '%security_invoker=on%' FROM pg_class WHERE oid='public.ocm_daily'::regclass);
