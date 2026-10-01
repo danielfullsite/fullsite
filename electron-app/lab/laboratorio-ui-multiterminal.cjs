@@ -111,6 +111,19 @@ const esperarHidratacion = async page => {
     return !!clave && typeof b[clave]?.onClick === 'function'
   })).catch(() => false), 'hidratación de la pantalla', 90000)
 }
+// Una foto es EVIDENCIA, no una aserción: nunca debe tumbar un caso.
+//
+// Con la red cortada (`wan = false`) Playwright espera a que carguen las
+// tipografías antes de capturar, y como nunca resuelven, se cuelga 30 s y mata
+// el caso. Medido el 2026-09-14: el recorrido con catálogo real moría en la foto
+// del menú sin internet, con todas las aserciones ya pasadas.
+async function captura(page, archivo) {
+  try {
+    await page.screenshot({ path: path.join(output, archivo), fullPage: true, timeout: 12000 })
+  } catch (e) {
+    console.log(`[evidencia] no se pudo capturar ${archivo}: ${e.message.split('\n')[0]}`)
+  }
+}
 function request(terminal, route, init = {}) {
   return fetch(`http://127.0.0.1:${terminal.port}${route}`, {
     ...init, headers: { ...headers,
@@ -211,9 +224,43 @@ const fixture = {
     capacity: 4, active: true, x_pct: 15 + number * 20, y_pct: 40, shape: 'square', zone: 'Salón' })),
   pos_turnos: [turno], pos_staff: [staff], pos_orders: [],
 }
+// ── Catálogo de un restaurante de verdad ─────────────────────────────────────
+//
+// Con `FULLSITE_LAB_CATALOGO=<ruta>` el laboratorio deja de usar su categoría de
+// juguete y siembra el catálogo real que la Caja sirve en `GET /catalog`. Los
+// bugs de DATOS —ruteos con huecos, modificadores obligatorios, densidad de
+// carta— no existen con una categoría y un café; y son la mitad de los que
+// muerden en campo. Sin la variable no cambia nada, así que CI sigue viendo el
+// fixture mínimo de siempre.
+//
+// El archivo vive FUERA del repositorio: éste es público y un catálogo real trae
+// precios y datos fiscales del cliente. Ver electron-app/lab/catalogo-real.cjs.
+const real = process.env.FULLSITE_LAB_CATALOGO
+  // La extensión va explícita: `require` sólo autocompleta .js/.json/.node, nunca .cjs.
+  ? require('./catalogo-real.cjs').cargar({ catalogo: process.env.FULLSITE_LAB_CATALOGO,
+      mesas: process.env.FULLSITE_LAB_MESAS, tenant, staff })
+  : null
+if (real) {
+  fixture.pos_menu_categories = real.categorias
+  fixture.pos_menu_items = real.items
+  if (real.metodos.length) fixture.pos_payment_methods = real.metodos
+  if (real.mesas) fixture.pos_mesas = real.mesas
+  fixture.clients[0].mesas = fixture.pos_mesas.length
+  const r = real.resumen()
+  console.log(`[catálogo real] ${r.categorias} categorías · ${r.productos} productos · ` +
+    `${r.grupos_modificadores} grupos de modificadores · ${r.modificadores} modificadores · ` +
+    `${r.metodos_pago} métodos de pago · ${r.mesas} mesas`)
+  console.log(`[catálogo real] estaciones ruteadas: ${r.estaciones.join(', ') || '(ninguna)'}`)
+  if (r.categorias_sin_estacion.length) {
+    const total = r.categorias_sin_estacion.reduce((s, c) => s + c.productos, 0)
+    console.log(`[catálogo real] ⚠ ${r.categorias_sin_estacion.length} categorías SIN estación (${total} productos):`)
+    for (const c of r.categorias_sin_estacion) console.log(`[catálogo real]    ${c.id} — ${c.nombre} (${c.productos})`)
+  }
+}
+
 // Un solo catálogo completo: lo consume la preparación de Caja antes de arrancar
 // y lo sirve la nube del laboratorio cuando Caja lo refresca tras un PIN online.
-const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
+const catalogoDeLab = () => real ? real.catalogo() : ({ schema_version: 1, complete: true, catalog_scope: 'restaurant', restaurant_id: tenant,
   refreshed_at: new Date().toISOString(), config: fixture.clients[0], settings: {
     'pos.station_routing': { barra: ['lab-bebidas'] },
     'pos.no_print_stations': ['cocina', 'barra', 'caja'],
@@ -223,6 +270,62 @@ const catalogoDeLab = () => ({ schema_version: 1, complete: true, catalog_scope:
     mods: [{ id: 'lab-hot', group_id: 'lab-temperature', name: 'Caliente de laboratorio', price: 0 }],
     item_links: [{ item_id: 'lab-cafe', group_id: 'lab-temperature' }], category_links: [] },
 })
+
+// ── Qué producto recorre la prueba ───────────────────────────────────────────
+//
+// El recorrido NO puede nombrar a mano su categoría ni su platillo. Con el
+// fixture mínimo funcionaba; con un catálogo real esa categoría no existe y el
+// caso muere buscando un botón que nadie va a pintar (medido el 2026-09-14:
+// 3/4 casos, el cuarto esperando «Bebidas laboratorio» 30 s).
+//
+// Se elige solo, y con criterio, no con el primero que aparezca:
+//   · categoría RUTEADA a una estación — el recorrido manda a cocina y mira el KDS;
+//   · de preferencia un producto CON grupo obligatorio, porque el caso que lo usa
+//     comprueba justamente que las opciones obligatorias llegan desde Caja sin
+//     internet. Si el catálogo no tiene ninguno, ese tramo se omite y se dice.
+function elegirEscenario(cat) {
+  const ruteo = (cat.settings || {})['pos.station_routing'] || {}
+  const estacionDe = new Map()
+  for (const [estacion, categorias] of Object.entries(ruteo)) {
+    for (const c of categorias || []) estacionDe.set(String(c).toLowerCase(), estacion)
+  }
+  const mods = cat.modifiers || {}
+  const obligatorios = new Map((mods.groups || []).filter(g => g.required).map(g => [g.id, g]))
+  const vinculos = new Map()
+  for (const l of mods.item_links || []) {
+    if (obligatorios.has(l.group_id)) vinculos.set(l.item_id, obligatorios.get(l.group_id))
+  }
+  const candidatas = (cat.categories || []).filter(c =>
+    (c.items || []).length && (estacionDe.has(String(c.id).toLowerCase()) || estacionDe.has(String(c.name || '').toLowerCase())))
+  const lista = candidatas.length ? candidatas : (cat.categories || []).filter(c => (c.items || []).length)
+  let categoria = null, producto = null, grupo = null
+  for (const c of lista) {
+    const conGrupo = (c.items || []).find(i => vinculos.has(i.id))
+    if (conGrupo) { categoria = c; producto = conGrupo; grupo = vinculos.get(conGrupo.id); break }
+  }
+  if (!producto && lista.length) { categoria = lista[0]; producto = categoria.items[0] }
+  if (!producto) throw new Error('El catálogo del laboratorio no tiene un solo producto')
+  const opcion = grupo ? (mods.mods || []).find(m => m.group_id === grupo.id) : null
+  const estacion = estacionDe.get(String(categoria.id).toLowerCase())
+    || estacionDe.get(String(categoria.name || '').toLowerCase()) || 'cocina'
+  return { categoria, producto, grupo: opcion ? grupo : null, opcion, estacion }
+}
+const escenario = elegirEscenario(catalogoDeLab())
+const precioUnitario = Number(escenario.producto.price) || 0
+const cantidadDePrueba = 2
+const subtotalDePrueba = Math.round(precioUnitario * cantidadDePrueba * 100) / 100
+const ivaDePrueba = Math.round(subtotalDePrueba * 0.16 * 100) / 100
+const totalDePrueba = Math.round((subtotalDePrueba + ivaDePrueba) * 100) / 100
+const escapar = t => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// El HTML COLAPSA los espacios seguidos. Un catálogo real trae nombres como
+// «HALF  HALF COMBO» —dos espacios— que en pantalla se pintan con uno solo, y
+// una expresión con los dos no coincide jamás. Medido el 2026-09-14: la cuarta
+// corrida murió 30 s esperando ese botón. Los fixtures de juguete no tienen
+// espacios dobles, ni acentos raros, ni nombres con salto de línea.
+const porNombre = t => new RegExp(escapar(String(t).trim()).replace(/\s+/g, '\\s+'))
+console.log(`[escenario] categoría «${escenario.categoria.name}» · producto «${escenario.producto.name}» ` +
+  `· estación ${escenario.estacion} · ${cantidadDePrueba} × ${precioUnitario} = ${totalDePrueba} con IVA` +
+  (escenario.grupo ? ` · grupo obligatorio «${escenario.grupo.name}»` : ' · SIN grupo obligatorio: ese tramo se omite'))
 
 // ── Nube del laboratorio ──────────────────────────────────────────────────────
 // Sirve lo que Caja pide a `app.fullsite.mx` desde su proceso Node: validación de
@@ -426,9 +529,194 @@ require(${JSON.stringify(path.join(ELECTRON_APP, 'main.js'))});\n`)
   return terminal
 }
 
+// ── Qué había realmente en la pantalla ───────────────────────────────────────
+//
+// Un laboratorio que sólo dice PASS puede estar mintiendo con toda la razón.
+// El 2026-09-13, en AMALAY, 3,803 pruebas estaban en verde mientras cuatro cosas
+// estaban rotas en el restaurante. Y estas cinco corridas fallaron cinco veces
+// con el mismo renglón —«esperaba un botón y no apareció»— sin decir NUNCA qué
+// sí había en pantalla. Eso no es una prueba, es una adivinanza cronometrada.
+//
+// `inspeccionar` levanta acta de lo que se ve: qué botones hay, si la página
+// pide scroll, qué contenedores se desbordan a lo ancho, y qué controles quedan
+// por debajo de los 56 px que exige un dedo. Se anota SIEMPRE, pase o falle,
+// porque «pasó» tampoco dice si se veía bien.
+async function inspeccionar(page) {
+  try {
+    return await page.evaluate(() => {
+      const visible = el => {
+        const r = el.getBoundingClientRect(), s = getComputedStyle(el)
+        return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'
+      }
+      const nombre = el => (el.getAttribute('aria-label') || el.innerText || el.value || el.placeholder || '')
+        .replace(/\s+/g, ' ').trim().slice(0, 70)
+      return {
+        ruta: location.pathname + location.search,
+        ventana: `${innerWidth}x${innerHeight}`,
+        documento_alto: document.documentElement.scrollHeight,
+        pide_scroll_vertical: document.documentElement.scrollHeight > innerHeight + 1,
+        desbordes_horizontales: [...document.querySelectorAll('*')]
+          .filter(el => el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX))
+          .slice(0, 8).map(el => ({ clase: String(el.className || '').slice(0, 60), ancho: el.scrollWidth, visible: el.clientWidth })),
+        controles_menores_56: [...document.querySelectorAll('button,input,select')].filter(visible)
+          .map(el => ({ control: nombre(el), alto: Math.round(el.getBoundingClientRect().height) }))
+          .filter(c => c.alto > 0 && c.alto < 56).slice(0, 12),
+        dialogo_abierto: document.querySelector('[role="dialog"]') ? nombre(document.querySelector('[role="dialog"]')) : null,
+        avisos: [...document.querySelectorAll('[class*=toast],[class*=Toast],[role=alert]')].filter(visible).map(nombre).filter(Boolean).slice(0, 4),
+        botones_visibles: [...document.querySelectorAll('button')].filter(visible).map(nombre).filter(Boolean).slice(0, 45),
+      }
+    })
+  } catch (e) { return { error: e.message.split('\n')[0] } }
+}
+
+const actas = []
+async function levantarActa(motivo, etiqueta) {
+  const acta = { motivo, etiqueta, ts: new Date().toISOString(), terminales: {} }
+  for (const t of terminals) {
+    if (!t?.page) continue
+    acta.terminales[t.name] = await inspeccionar(t.page)
+    await captura(t.page, `acta-${etiqueta}-${t.name.replace(/\s+/g, '-').toLowerCase()}.png`)
+  }
+  actas.push(acta)
+  return acta
+}
+
 async function check(name, run) {
-  try { await run(); results.push({ name, passed: true }); console.log(`PASS ${name}`) }
-  catch (error) { results.push({ name, passed: false, error: error.message }); throw error }
+  const etiqueta = String(results.length + 1).padStart(2, '0')
+  try {
+    await run()
+    results.push({ name, passed: true })
+    console.log(`PASS ${name}`)
+    await levantarActa('caso aprobado', etiqueta)
+  } catch (error) {
+    const primera = error.message.split('\n')[0]
+    results.push({ name, passed: false, error: primera })
+    console.log(`FALLA ${name}`)
+    console.log(`      ${primera}`)
+    const acta = await levantarActa('caso fallido', etiqueta)
+    // Lo que de verdad hacía falta las cinco veces: qué SÍ había en pantalla.
+    for (const [terminal, info] of Object.entries(acta.terminales)) {
+      if (!info.botones_visibles) continue
+      console.log(`      ${terminal} en ${info.ruta} (${info.ventana}) — ${info.botones_visibles.length} botones visibles`)
+      console.log(`        ${info.botones_visibles.slice(0, 14).join(' | ')}`)
+      if (info.avisos?.length) console.log(`        avisos en pantalla: ${info.avisos.join(' | ')}`)
+      if (info.dialogo_abierto) console.log(`        diálogo abierto: ${info.dialogo_abierto}`)
+    }
+    // NO se aborta: una falla no puede esconder a las siguientes. El acta dice
+    // si las de abajo cayeron por arrastre.
+  }
+}
+
+// ── Recorrido de TODAS las pantallas, en los dos estados de red ──────────────
+//
+// Daniel, 2026-09-14: «quiero llegar al cien por ciento de las pantallas y
+// validar cada una online, offline, saber que está offline, saber que está
+// online, validar que los botones funcionen, que las órdenes llegan».
+//
+// Hasta esta noche el laboratorio visitaba 3 de 33 pantallas: el 9%.
+//
+// QUÉ COMPRUEBA ESTO, Y QUÉ NO
+//
+//   SÍ: que la pantalla cargue, que no quede en blanco, que no reviente, que no
+//       pida scroll, que nada se desborde a lo ancho, que ningún control quede
+//       por debajo de 56 px, y el inventario de botones con su estado.
+//   NO: que cada botón haga lo correcto. Picarle a todos a ciegas no es
+//       validación: hay botones que cobran, cancelan y borran. Eso se escribe
+//       pantalla por pantalla, y vive en los casos de arriba.
+//
+// EL ESTADO DE RED SE DEMUESTRA, NO SE SUPONE. El documento probado en campo lo
+// dice: «nunca equiparar navigator.onLine con conectividad real». Aquí se prueba
+// desde DENTRO de la página, que es quien lo sufre: se pide algo a la nube y algo
+// a Pedro. Online = la nube contesta. Offline = la nube NO contesta y Pedro SÍ,
+// que es la definición de «sin internet pero con LAN».
+const PANTALLAS = ['', 'mesas', 'plano', 'turno', 'corte', 'cocina', 'barra', 'panaderia',
+  'historial', 'monitor', 'auditoria', 'staff', 'staff-analytics', 'asistencia', 'cliente',
+  'configuracion', 'huella', 'qr', 'delivery', 'facturacion', 'facturas-proveedor',
+  'recepcion-factura', 'compras', 'orden-compra', 'recetas', 'food-cost', 'merma',
+  'inventario', 'inventario-fisico', 'inventario-market', 'plano-editor', 'ui-kit', 'kds']
+
+// GUARDIÁN: si alguien agrega una pantalla al POS y no la agrega aquí, esta
+// corrida se detiene. Es la forma de que «el 9% de las pantallas» no vuelva a
+// pasar sin que nadie se entere.
+{
+  const dirPantallas = path.join(APP, 'src/app/pos')
+  const enDisco = fs.readdirSync(dirPantallas, { withFileTypes: true })
+    .filter(d => d.isDirectory() && fs.existsSync(path.join(dirPantallas, d.name, 'page.tsx')))
+    .map(d => d.name)
+  const sinRecorrer = enDisco.filter(n => !PANTALLAS.includes(n))
+  if (sinRecorrer.length) {
+    throw new Error(`Pantallas del POS sin recorrer: ${sinRecorrer.join(', ')}. Agrégalas a PANTALLAS en este archivo.`)
+  }
+}
+
+async function estadoDeRedReal(page, puertoPedro) {
+  return page.evaluate(async puerto => {
+    const alcanza = async url => {
+      try {
+        const c = new AbortController()
+        const t = setTimeout(() => c.abort(), 4000)
+        const r = await fetch(url, { cache: 'no-store', signal: c.signal })
+        clearTimeout(t)
+        return r.status > 0
+      } catch { return false }
+    }
+    return {
+      nube: await alcanza('https://app.fullsite.mx/api/pos/menu'),
+      pedro: await alcanza(`http://127.0.0.1:${puerto}/health`),
+      navigator_onLine: navigator.onLine,
+    }
+  }, puertoPedro)
+}
+
+async function recorrerPantallas(terminal, etiquetaRed) {
+  const hallazgos = []
+  const red = await estadoDeRedReal(terminal.page, terminal.port)
+  const coherente = etiquetaRed === 'online' ? red.nube === true : (red.nube === false && red.pedro === true)
+  console.log(`\n── PANTALLAS · ${terminal.name} · red declarada ${etiquetaRed} ──`)
+  console.log(`   comprobado: nube=${red.nube} pedro=${red.pedro} navigator.onLine=${red.navigator_onLine}` +
+    (coherente ? '  ✓ coherente' : '  ✗ NO COINCIDE con lo declarado'))
+  if (red.navigator_onLine !== red.nube) {
+    console.log(`   ⚠ navigator.onLine dice ${red.navigator_onLine} y la nube ${red.nube ? 'sí' : 'no'} contesta: por eso no se le cree`)
+  }
+  hallazgos.push({ pantalla: '(estado de red)', red, declarado: etiquetaRed, coherente })
+
+  for (const ruta of PANTALLAS) {
+    const url = ruta === 'kds' ? `http://127.0.0.1:${terminal.port}/kds` : `${uiOrigin}/pos${ruta ? '/' + ruta : ''}`
+    const h = { pantalla: ruta || '(raíz /pos)', red: etiquetaRed }
+    try {
+      await terminal.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      await esperarHidratacion(terminal.page).catch(() => {})
+      const info = await inspeccionar(terminal.page)
+      const cuerpo = await terminal.page.evaluate(() => ({
+        texto: (document.body.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 400),
+        largo: (document.body.innerText || '').trim().length,
+      }))
+      h.ruta = info.ruta
+      h.botones = info.botones_visibles?.length ?? 0
+      h.vacia = cuerpo.largo < 40
+      h.reventada = /Application error|Unhandled Runtime|No se pudieron|Algo salió mal/i.test(cuerpo.texto)
+      h.pide_scroll = info.pide_scroll_vertical
+      h.desbordes = info.desbordes_horizontales?.length ?? 0
+      h.controles_chicos = info.controles_menores_56?.length ?? 0
+      h.redirigida = !info.ruta.includes(ruta) && ruta !== '' && ruta !== 'kds'
+      h.muestra = cuerpo.texto.slice(0, 120)
+      await captura(terminal.page, `pantalla-${etiquetaRed}-${ruta || 'raiz'}.png`)
+    } catch (e) {
+      h.error = e.message.split('\n')[0]
+    }
+    const mal = h.error || h.vacia || h.reventada
+    console.log(`   ${mal ? 'MAL ' : h.pide_scroll || h.desbordes ? 'OJO ' : 'ok  '} /pos/${ruta.padEnd(20)}` +
+      (h.error ? ` ${h.error}` :
+       h.vacia ? ' EN BLANCO' :
+       h.reventada ? ' REVENTADA' :
+       `${String(h.botones).padStart(3)} botones` +
+       (h.redirigida ? `  → redirigió a ${h.ruta}` : '') +
+       (h.pide_scroll ? '  pide scroll' : '') +
+       (h.desbordes ? `  ${h.desbordes} desborde(s)` : '') +
+       (h.controles_chicos ? `  ${h.controles_chicos} control(es) <56px` : '')))
+    hallazgos.push(h)
+  }
+  return hallazgos
 }
 
 async function main() {
@@ -615,7 +903,7 @@ async function main() {
       assert(preparada, 'Caja debe conservar la credencial preparada')
       assert(preparada.devices?.[pos3.terminalId] > Date.now(), 'preparada para la terminal que tecleó')
       assert(typeof preparada.hash === 'string' && !Object.values(preparada).includes(pinDelLab), 'el PIN no se guarda en claro')
-      await pos3.page.screenshot({ path: path.join(output, 'pin-online-entra.png'), fullPage: true })
+      await captura(pos3.page, 'pin-online-entra.png')
     })
     await check('Sin internet, Caja rechaza el PIN sin preparar y acepta el preparado sin consultar la nube', async () => {
       // Cierre de turno: se vacía la sesión y se recarga, como al reabrir la
@@ -640,7 +928,7 @@ async function main() {
       const sinNube = pinsEnLaNube().slice(vistosAntes)
       assert.equal(sinNube.length, 2, `Caja intentó la nube en ambos PIN: ${JSON.stringify(sinNube)}`)
       assert(sinNube.every(r => r.wan === false), 'ninguna llegó a responderse: la nube estaba caída')
-      await pos3.page.screenshot({ path: path.join(output, 'pin-offline-entra.png'), fullPage: true })
+      await captura(pos3.page, 'pin-offline-entra.png')
       wan = true
       // El resto del recorrido usa la sesión firmada preparada (comandos
       // financieros por HTTP con actor_token). El PIN ya probó la ENTRADA; se
@@ -657,13 +945,14 @@ async function main() {
   const orderId = randomUUID()
   await command(caja, 'TURNO_OPENED', { ...turno, turno_id: turno.id, ts: turno.opened_at })
   await command(pos2, 'ORDER_SENT', { order_id: orderId, mesa: 1, mesero: staff.name,
-    customer_name: 'Familia laboratorio', personas: 3, status: 'enviada', total: 116,
-    subtotal: 100, iva: 16, saldo: 116, turno_id: turno.id, order_revision: 4,
-    items: [{ id: 'lab-line-1', nombre: 'Café de laboratorio', cantidad: 2, precio: 50,
-      subtotal: 100, precioExtra: 0, modificadores: [], notas: '', station: 'barra', menuItemId: 'lab-cafe' }],
+    customer_name: 'Familia laboratorio', personas: 3, status: 'enviada', total: totalDePrueba,
+    subtotal: subtotalDePrueba, iva: ivaDePrueba, saldo: totalDePrueba, turno_id: turno.id, order_revision: 4,
+    items: [{ id: 'lab-line-1', nombre: escenario.producto.name, cantidad: cantidadDePrueba, precio: precioUnitario,
+      subtotal: subtotalDePrueba, precioExtra: 0, modificadores: [], notas: '', station: escenario.estacion,
+      menuItemId: escenario.producto.id }],
   })
   await check('La comanda llega a la pantalla de cocina por LAN', async () => {
-    await expect(kds.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
+    await expect(kds.page.locator('body')).toContainText(escenario.producto.name, { timeout: 20000 })
   })
   await check('Un comando WebSocket del POS secundario se confirma en Caja', async () => {
     const id = randomUUID()
@@ -677,26 +966,44 @@ async function main() {
   await check('Sin internet, POS 3 abre los productos y el total de la misma cuenta', async () => {
     await pos3.page.goto(`${uiOrigin}/pos?mesa=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
     await esperarHidratacion(pos3.page)
-    await expect(pos3.page.locator('body')).toContainText('Café de laboratorio', { timeout: 20000 })
-    await expect(pos3.page.locator('body')).toContainText(/116[.,]00/, { timeout: 10000 })
+    await expect(pos3.page.locator('body')).toContainText(escenario.producto.name, { timeout: 20000 })
+    await expect(pos3.page.locator('body')).toContainText(
+      new RegExp(escapar(totalDePrueba.toFixed(2)).replace('\\.', '[.,]')), { timeout: 10000 })
     const visible = await pos3.page.evaluate(tenant => JSON.parse(localStorage.getItem(`pos_cuenta_${tenant}_mesa:1`) || 'null')?.confirmed, tenant)
     assert.equal(visible?.id, orderId, 'El editor conservó el ID de la cuenta de Caja')
     assert.equal(visible?.items?.[0]?.cantidad, 2)
-    await pos3.page.screenshot({ path: path.join(output, 'cuenta-compartida-sin-internet.png'), fullPage: true })
+    await captura(pos3.page, 'cuenta-compartida-sin-internet.png')
   })
   await check('POS 3 sin caché obtiene menú y opciones obligatorias de Caja sin internet', async () => {
-    await pos3.page.getByRole('button', { name: /Bebidas laboratorio/ }).click()
-    await pos3.page.getByRole('button', { name: /Café de laboratorio.*50/ }).click()
-    await expect(pos3.page.getByRole('button', { name: 'Elige Preparación de laboratorio' })).toBeDisabled()
-    await pos3.page.getByText('Caliente de laboratorio', { exact: true }).click()
-    await expect(pos3.page.getByRole('button', { name: /Agregar.*50/ })).toBeEnabled()
-    await pos3.page.screenshot({ path: path.join(output, 'catalogo-compartido-sin-internet.png'), fullPage: true })
+    // Con un catálogo real la carta PAGINA: 38 categorías no caben en una pantalla
+    // (en AMALAY se ven «1 / 2 · 36 categorías»), así que la categoría elegida
+    // puede estar en la segunda página y el clic directo nunca la encuentra.
+    // Medido el 2026-09-14: el recorrido murió 30 s esperando «Signature».
+    // Un cajero con 464 productos tampoco pagina: escribe en el buscador.
+    const buscador = pos3.page.getByPlaceholder(/Buscar platillo/i)
+    if (await buscador.count()) {
+      await buscador.fill(escenario.producto.name.trim().split(/\s+/).slice(0, 2).join(' '))
+    } else {
+      await pos3.page.getByRole('button', { name: porNombre(escenario.categoria.name) }).click()
+    }
+    await pos3.page.getByRole('button', { name: porNombre(escenario.producto.name) }).first().click()
+    if (escenario.grupo && escenario.opcion) {
+      // El botón de agregar nace deshabilitado hasta elegir la opción obligatoria:
+      // eso es lo que demuestra que el grupo viajó desde Caja sin internet.
+      await expect(pos3.page.getByRole('button', { name: `Elige ${escenario.grupo.name}` })).toBeDisabled()
+      await pos3.page.getByText(escenario.opcion.name, { exact: true }).click()
+      await expect(pos3.page.getByRole('button', { name: /Agregar/ })).toBeEnabled()
+    } else {
+      console.log('[escenario] el catálogo no trae grupos obligatorios: sólo se comprueba que el menú llegó')
+      await expect(pos3.page.getByRole('button', { name: /Agregar/ })).toBeEnabled()
+    }
+    await captura(pos3.page, 'catalogo-compartido-sin-internet.png')
     await pos3.page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   })
   await check('Una instalación sin transición rechaza crear otra autoridad monetaria', async () => {
     const response = await request(pos2, '/events', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command_type: 'FINANCIAL_OPEN', command_id: randomUUID(), order_id: orderId,
-        turno_id: turno.id, expected_revision: 0, expected_order_revision: 4, total_cents: 11600, currency: 'MXN' }) })
+        turno_id: turno.id, expected_revision: 0, expected_order_revision: 4, total_cents: Math.round(totalDePrueba * 100), currency: 'MXN' }) })
     assert.equal((await response.json()).results[0].code, 'LOCAL_AUTHORITY_DISABLED')
     assert.equal((await (await request(caja, '/state')).json()).financial_orders.length, 0)
   })
@@ -707,12 +1014,12 @@ async function main() {
     caja = await startTerminal('Caja', 'server_pos', ports[0], ports[0], uiOrigin, ports)
     const snapshot = await (await request(caja, '/state')).json()
     const recovered = snapshot.salon_orders.find(o => o.id === orderId || o.order_id === orderId)
-    assert.equal(recovered.total, 116)
+    assert.equal(recovered.total, totalDePrueba)
     assert(snapshot.kds_orders.some(o => o.id === orderId || o.order_id === orderId))
-    await expect(pos3.page.locator('body')).toContainText(/Saldo confirmado en Caja:.*116[.,]00/)
+    await expect(pos3.page.locator('body')).toContainText(new RegExp('Saldo confirmado en Caja:.*' + escapar(totalDePrueba.toFixed(2)).replace('\\.', '[.,]')))
   })
   await check('Cocina legacy confirma preparación sin inventar liquidación', async () => {
-    await kds.page.locator('.card').filter({ hasText: 'Café de laboratorio' }).getByRole('button', { name: /Todo listo/ }).click()
+    await kds.page.locator('.card').filter({ hasText: escenario.producto.name }).getByRole('button', { name: /Todo listo/ }).click()
     await until(async () => {
       const snapshot = await (await request(caja, '/state')).json()
       return snapshot.kds_orders.find(o => o.id === orderId || o.order_id === orderId)?.status === 'lista'
@@ -803,5 +1110,60 @@ main().catch(error => {
       'La nube está simulada; órdenes y réplicas usan Pedro real'],
     errors: terminals.flatMap(t => t.errors.map(error => ({ terminal: t.name, error }))),
   }, null, 2))
+// ── El cien por ciento de las pantallas, en los dos estados de red ─────────
+  if (process.env.FULLSITE_LAB_PANTALLAS === '1') {
+    const pantallas = []
+    wan = true
+    await new Promise(r => setTimeout(r, 1500))
+    pantallas.push(...await recorrerPantallas(caja, 'online'))
+    wan = false
+    await new Promise(r => setTimeout(r, 1500))
+    pantallas.push(...await recorrerPantallas(caja, 'offline'))
+    fs.writeFileSync(path.join(output, 'recorrido-de-pantallas.json'), JSON.stringify(pantallas, null, 2))
+    const visitas = pantallas.filter(p => p.pantalla !== '(estado de red)')
+    const rotas = visitas.filter(p => p.error || p.vacia || p.reventada)
+    const conScroll = visitas.filter(p => p.pide_scroll)
+    const conDesborde = visitas.filter(p => p.desbordes)
+    console.log(`\nPANTALLAS: ${visitas.length} visitas · ${rotas.length} rotas · ` +
+      `${conScroll.length} piden scroll · ${conDesborde.length} con desborde`)
+    if (rotas.length) console.log(`   rotas: ${rotas.map(p => `${p.pantalla}[${p.red}]`).join(', ')}`)
+  }
+
+  // ── El acta, en un archivo que una persona pueda leer en dos minutos ───────
+  const lineas = ['# Acta del recorrido', '', `Corrida: ${new Date().toISOString()}`,
+    `Catálogo: ${real ? 'REAL — ' + fixture.pos_menu_categories.length + ' categorías, ' + fixture.pos_menu_items.length + ' productos' : 'fixture mínimo'}`,
+    real ? `Escenario: «${escenario.categoria.name}» → «${escenario.producto.name}» · estación ${escenario.estacion}` +
+      (escenario.grupo ? ` · grupo obligatorio «${escenario.grupo.name}»` : ' · sin grupo obligatorio') : '', '',
+    '## Veredicto', '']
+  for (const r of results) lineas.push(`- ${r.passed ? 'PASA ' : 'FALLA'} ${r.name}${r.passed ? '' : `\n      ${r.error}`}`)
+  lineas.push('', '## Lo visual, caso por caso', '')
+  for (const acta of actas) {
+    lineas.push(`### ${acta.etiqueta} — ${acta.motivo}`)
+    for (const [terminal, i] of Object.entries(acta.terminales)) {
+      if (i.error) { lineas.push(`- **${terminal}**: no se pudo inspeccionar (${i.error})`); continue }
+      const notas = []
+      if (i.pide_scroll_vertical) notas.push(`**pide scroll vertical** (documento ${i.documento_alto}px en ventana de ${i.ventana})`)
+      if (i.desbordes_horizontales?.length) notas.push(`**${i.desbordes_horizontales.length} contenedor(es) desbordados a lo ancho**: ` +
+        i.desbordes_horizontales.map(d => `${d.clase || '(sin clase)'} ${d.ancho}px en ${d.visible}px`).join(' · '))
+      if (i.controles_menores_56?.length) notas.push(`**${i.controles_menores_56.length} control(es) por debajo de 56px**: ` +
+        i.controles_menores_56.map(c => `${c.control || '(sin nombre)'} ${c.alto}px`).join(' · '))
+      if (i.avisos?.length) notas.push(`avisos: ${i.avisos.join(' | ')}`)
+      if (i.dialogo_abierto) notas.push(`diálogo: ${i.dialogo_abierto}`)
+      lineas.push(`- **${terminal}** · ${i.ruta} · ${i.ventana}` + (notas.length ? '\n  - ' + notas.join('\n  - ') : ' — sin observaciones'))
+    }
+    lineas.push('')
+  }
+  const actaPath = path.join(output, 'acta-del-recorrido.md')
+  fs.writeFileSync(actaPath, lineas.join('\n'))
+  fs.writeFileSync(path.join(output, 'acta-del-recorrido.json'), JSON.stringify({ results, actas }, null, 2))
+
+  const conScroll = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.pide_scroll_vertical).length
+  const conDesborde = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.desbordes_horizontales?.length).length
+  const chicos = actas.flatMap(a => Object.entries(a.terminales))
+    .filter(([, i]) => i.controles_menores_56?.length).length
   console.log(`${results.filter(r => r.passed).length}/${results.length} casos UI. Evidencia: ${output}`)
+  console.log(`ACTA VISUAL: ${conScroll} pantalla(s) piden scroll · ${conDesborde} con desborde horizontal · ${chicos} con controles menores a 56px`)
+  console.log(`ACTA: ${actaPath}`)
 })
