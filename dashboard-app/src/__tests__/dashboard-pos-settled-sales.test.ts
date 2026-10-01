@@ -1,35 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+// El lector server-side (/api/dashboard/pos-daily) devuelve { orders: [...] } ya paginado
+// y validado; el cliente sólo agrega. La paginación keyset, el dedupe y el rechazo por
+// día de venta faltante viven ahora en la RUTA y se prueban en pos-daily-route.test.ts.
 const fetchMock = vi.hoisted(() => { process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://synthetic.invalid'; process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon'; return vi.fn() })
 vi.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }) } } }))
 vi.mock('@/lib/fetch-with-timeout', () => ({ fetchWithTimeout: fetchMock }))
 import { getDashboardFromPosOrders, getRecentDays, getLatestDay, getDateRange } from '@/lib/data'
 const sale = (id: string, extra: Record<string, unknown> = {}) => ({ id, dia_venta: '2026-09-09', status: 'cerrada', total: 100, subtotal: 100, iva: 0, descuento: 0, propina: 0, mesa: 1, mesero: 'Ana', personas: 1, items: [], pagos: [], created_at: '2026-09-10T07:00:00Z', ...extra })
-function serve(rows: ReturnType<typeof sale>[], cap = 1000) {
-  fetchMock.mockImplementation(async (url: string) => {
-    const after = new URL(url, 'https://synthetic.invalid').searchParams.get('id')?.slice(4, -1)
-    return Response.json(rows.filter(r => !after || r.id > after).slice(0, cap))
-  })
+// La ruta responde { orders }. El cliente hace UNA sola llamada y agrega.
+function serve(rows: ReturnType<typeof sale>[]) {
+  fetchMock.mockImplementation(async () => Response.json({ orders: rows }))
 }
 beforeEach(() => { fetchMock.mockReset() })
-describe('settled POS sales reader', () => {
-  it('reads more than 5000 rows despite a smaller server cap using stable scoped keyset pages', async () => {
-    serve(Array.from({ length: 5107 }, (_, i) => sale(String(i).padStart(6, '0'))), 700)
+describe('settled POS sales reader (cliente agrega lo que da la ruta)', () => {
+  it('pide la ruta server-side con el tenant y el rango, en una sola llamada', async () => {
+    serve([sale('a')])
     const [day] = await getDashboardFromPosOrders(30, 'restaurant-a', 'branch-a')
-    expect(day.tickets_count).toBe(5107)
-    expect(day.ventas_dia).toBe(510700)
-    expect(fetchMock).toHaveBeenCalledTimes(9)
-    for (const [url] of fetchMock.mock.calls) {
-      const p = new URL(url, 'https://synthetic.invalid').searchParams
-      expect(p.get('client_id')).toBe('eq.restaurant-a')
-      expect(p.get('location_id')).toBe('eq.branch-a')
-      expect(p.get('order')).toBe('id.asc')
-      expect(p.has('offset')).toBe(false)
-      expect(p.has('created_at')).toBe(false)
-      expect(p.get('dia_venta')).toMatch(/^gte\./)
-    }
+    expect(day.tickets_count).toBe(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const p = new URL(fetchMock.mock.calls[0][0], 'https://synthetic.invalid')
+    expect(p.pathname).toBe('/api/dashboard/pos-daily')
+    expect(p.searchParams.get('client_id')).toBe('restaurant-a')
+    expect(p.searchParams.get('location_id')).toBe('branch-a')
+    expect(p.searchParams.get('since')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
-  it('rejects a mid-page failure instead of returning partial sales', async () => {
-    fetchMock.mockResolvedValueOnce(Response.json([sale('a')])).mockResolvedValueOnce(new Response('', { status: 503 }))
+  it('rechaza una lectura fallida en vez de devolver ventas parciales', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }))
     await expect(getDashboardFromPosOrders(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
   })
   it('uses business day, counts paid kitchen work, excludes partial/deferred/cancelled sales and invents no methods', async () => {
@@ -66,11 +62,7 @@ describe('settled POS sales reader', () => {
     serve([sale('a', { pagos: '{invalid' })])
     await expect(getDashboardFromPosOrders(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
   })
-  it('rejects missing business day, repeated pages and malformed responses', async () => {
-    fetchMock.mockResolvedValueOnce(Response.json([sale('a', { dia_venta: null })]))
-    await expect(getDashboardFromPosOrders(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
-    fetchMock.mockImplementation(async () => Response.json([sale('a')]))
-    await expect(getDashboardFromPosOrders(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
+  it('rechaza una respuesta mal formada (sin arreglo orders)', async () => {
     fetchMock.mockResolvedValue(Response.json({ error: 'unavailable' }))
     await expect(getDashboardFromPosOrders(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
   })
@@ -79,24 +71,24 @@ describe('settled POS sales reader', () => {
 
 describe('report source fallback', () => {
   it('preserves real Wansoft history when POS is unavailable, including latest day', async () => {
-    fetchMock.mockImplementation(async (url: string) => url.includes('/pos_orders')
+    fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily')
       ? new Response('', { status: 503 })
       : Response.json([{ fecha: '2026-09-08', ventas_dia: 1234, tickets_count: 2 }]))
     expect((await getRecentDays(30, 'restaurant-a'))[0].ventas_dia).toBe(1234)
     expect((await getLatestDay('restaurant-a'))?.fecha).toBe('2026-09-08')
   })
   it('propagates unavailable when neither source provides confirmed data', async () => {
-    fetchMock.mockImplementation(async (url: string) => url.includes('/pos_orders')
+    fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily')
       ? new Response('', { status: 503 }) : Response.json([]))
     await expect(getRecentDays(30, 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
     await expect(getLatestDay('restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
     await expect(getDateRange('2020-01-01', '2020-01-07', 'restaurant-a')).rejects.toThrow('POS_REPORT_UNAVAILABLE')
   })
   it('historical date ranges look back to the requested start, not merely the interval length', async () => {
-    fetchMock.mockImplementation(async () => Response.json([]))
+    fetchMock.mockImplementation(async (url: string) => url.includes('/pos-daily') ? Response.json({ orders: [] }) : Response.json([]))
     await getDateRange('2020-01-01', '2020-01-07', 'restaurant-a')
-    const call = fetchMock.mock.calls.find(([url]) => url.includes('/pos_orders'))!
-    const cutoff = new URL(call[0], 'https://synthetic.invalid').searchParams.get('dia_venta')!.slice(4)
-    expect(cutoff <= '2020-01-01').toBe(true)
+    const call = fetchMock.mock.calls.find(([url]) => url.includes('/pos-daily'))!
+    const since = new URL(call[0], 'https://synthetic.invalid').searchParams.get('since')!
+    expect(since <= '2020-01-01').toBe(true)
   })
 })

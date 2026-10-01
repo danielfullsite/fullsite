@@ -16,42 +16,45 @@ const TOKEN_CACHE_MS = 30_000
 export async function getAuthToken(): Promise<string> {
   const now = Date.now()
   if (_cachedToken && (now - _cachedTokenTime) < TOKEN_CACHE_MS) return _cachedToken
+
+  // STORAGE PRIMERO. El token de sesión vive en localStorage desde el login
+  // (`sb-<ref>-auth-token`) y leerlo es SÍNCRONO y confiable. Antes esto
+  // arrancaba con `supabase.auth.getSession()` en una carrera contra un timeout
+  // de 3 s, y sólo usaba el storage como fallback (`session?.access_token ||
+  // readSessionTokenFromStorage()`). En App Router getSession() se cuelga (falla
+  // conocida, ver AGENTS.md); con la sesión ya en el storage, esa carrera no
+  // aporta nada y sí abre la ventana en la que getAuthToken devolvía la anon key.
+  //
+  // Consecuencia observada en campo (2026-09-30, amalay): con la anon key, el
+  // guard de getDashboardFromPosOrders (`token === SUPABASE_KEY → throw`) tumbaba
+  // la lectura ANTES de pedir pos_orders. pos nunca se consultaba y el dashboard
+  // caía a wansoft_daily, congelado en el último día de esa fuente (8-sep) aunque
+  // pos_orders tenía el día en curso. Leer el storage primero cierra esa ventana.
+  const stored = readSessionTokenFromStorage()
+  if (stored) {
+    _cachedToken = stored
+    _cachedTokenTime = now
+    return stored
+  }
+
+  // Sin token en el storage (primeros ms antes de que el SDK lo escriba, o sesión
+  // recién refrescada): intenta el SDK con timeout. SÓLO se cachea un token REAL;
+  // sin sesión se devuelve la anon key SIN cachearla, para que la siguiente
+  // llamada reintente en cuanto el storage se hidrate.
   try {
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
     const sessionP = supabase.auth.getSession().then(r => r.data.session).catch(() => null)
     const session = await Promise.race([sessionP, timeout])
-
-    // SÓLO se cachea un token de sesión REAL.
-    //
-    // Antes esto hacía `_cachedToken = session?.access_token || SUPABASE_KEY` y
-    // guardaba el resultado pasara lo que pasara. O sea: si la sesión todavía no
-    // estaba lista —cosa normal en los primeros milisegundos de la app, o si
-    // getSession() tardaba más de 3 s en una red mala— se cacheaba LA ANON KEY
-    // como si fuera un token, y se la devolvía a TODOS los que llamaran durante
-    // los siguientes 30 segundos.
-    //
-    // Con RLS eso no da error: da CERO FILAS. No hay ninguna política para el rol
-    // anon en todo el esquema (0 de 350), así que cada consulta de esa ventana
-    // regresaba vacía y cada pantalla mostraba su estado de "sin datos" o su
-    // fallback, en silencio.
-    //
-    // Así se veía: la configuración del restaurante nunca cargaba, y el sidebar
-    // decía "amalay" en vez de "AMALAY Coffee & Market" con IVA del 16% aplicado
-    // a restaurantes que cobran 0. Arreglar la consulta de client-config no bastó
-    // —la hice usar este token y siguió fallando— porque el veneno estaba aquí.
-    //
-    // Ahora, sin sesión se devuelve la anon key SIN cachearla: la siguiente
-    // llamada vuelve a intentar, y en cuanto la sesión existe se cachea de verdad.
-    const token = session?.access_token || readSessionTokenFromStorage()
-    if (!token) return SUPABASE_KEY
-
-    _cachedToken = token
-    _cachedTokenTime = now
-    return token
+    const token = session?.access_token
+    if (token) {
+      _cachedToken = token
+      _cachedTokenTime = now
+      return token
+    }
   } catch {
-    // Tampoco se cachea el error: reintentar es barato, quedarse ciego 30 s no.
-    return readSessionTokenFromStorage() || SUPABASE_KEY
+    // cae a anon abajo
   }
+  return SUPABASE_KEY
 }
 
 /**
@@ -618,36 +621,26 @@ export async function getDashboardFromPosOrders(days: number = 30, clientId: str
   const cutoff = nowMX()
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = fmtDateMX(cutoff)
-  const token = await getAuthToken()
-  if (!token || token === SUPABASE_KEY) throw new Error('POS_REPORT_UNAVAILABLE: authenticated session required')
-  const all: PosDashboardOrder[] = []
-  const seen = new Set<string>()
-  let after: string | undefined
-  for (;;) {
-    // Select * tolerates additive Caja columns on legacy deployments. dia_venta
-    // is required: substituting created_at would silently move after-midnight sales.
-    const params = new URLSearchParams({ select: '*', client_id: `eq.${clientId}`,
-      dia_venta: `gte.${cutoffStr}`, order: 'id.asc', limit: '1000' })
-    if (locationId) params.set('location_id', `eq.${locationId}`)
-    if (after) params.set('id', `gt."${after.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
-    let page: PosDashboardOrder[]
-    try {
-      const response = await fetchWithTimeout(`${SUPABASE_URL}/rest/v1/pos_orders?${params}`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` }, cache: 'no-store',
-      }, 10_000)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const body: unknown = await response.json()
-      if (!Array.isArray(body)) throw new Error('invalid rows')
-      page = body
-      for (const row of page) {
-        if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) ||
-          typeof row.dia_venta !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.dia_venta)) throw new Error('invalid or repeated row')
-        seen.add(row.id)
-      }
-    } catch { throw new Error('POS_REPORT_UNAVAILABLE: incomplete order read') }
-    if (!page.length) break
-    all.push(...page)
-    after = page[page.length - 1].id
+  // Lectura server-side vía /api/dashboard/pos-daily (service_role). Antes esto
+  // leía pos_orders DIRECTO desde el navegador con el token de sesión de Supabase,
+  // que en el arranque de App Router no está listo a tiempo (getSession() se
+  // cuelga, falla conocida). La lectura tronaba y el dashboard caía en silencio a
+  // wansoft_daily, muerto desde 2026-09-08 — mostrando datos de hace semanas como
+  // si fueran de hoy. Del lado servidor la credencial siempre está (sin carrera de
+  // token), y el aislamiento por restaurante lo garantiza requireTenant con la
+  // sesión, no un header del cliente. La cookie de sesión same-origin viaja sola,
+  // así que aquí no se toca ningún token de Supabase.
+  const params = new URLSearchParams({ client_id: clientId, since: cutoffStr })
+  if (locationId) params.set('location_id', locationId)
+  let all: PosDashboardOrder[]
+  try {
+    const response = await fetchWithTimeout(`/api/dashboard/pos-daily?${params}`, { cache: 'no-store' }, 15_000)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const body = await response.json() as { orders?: unknown }
+    if (!Array.isArray(body.orders)) throw new Error('invalid rows')
+    all = body.orders as PosDashboardOrder[]
+  } catch {
+    throw new Error('POS_REPORT_UNAVAILABLE: incomplete order read')
   }
   const parentsWithChildren = new Set(all.map(o => o.parent_order_id).filter(Boolean))
   const cajaParents = new Set(all.filter(o => o.caja_stream_id).map(o => o.id))
