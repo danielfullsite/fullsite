@@ -82,16 +82,20 @@ describe('BUG-019 — PIN lookup usa service role, no anon', () => {
     expect(JSON.stringify(json)).not.toContain(SERVICE)
   })
 
-  it('el path de fingerprint también usa la service key para el lookup de pos_staff', async () => {
+  // Contrato cambiado el 2026-09-23 (F-01): la rama de huella ya no existe. Un
+  // `fingerprint_id` no es credencial, así que ni siquiera se consulta pos_staff —
+  // con ninguna llave. Ver pos-pin-huella-no-es-credencial.test.ts.
+  it('un fingerprint_id se rechaza sin consultar pos_staff (ni con service ni con anon)', async () => {
     stubFetch([{ id: 's2', name: 'Hector', role: 'cajero' }])
     const { POST } = await import('@/app/api/pos/pin/route')
 
-    await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
+    const res = await POST(makeReq({ fingerprint_id: 'fp-abc', client_id: 'tenantB' }))
 
-    const staffCall = outbound.find(c => c.url.includes('pos_staff'))
-    expect(staffCall, 'no hubo consulta a pos_staff en el path de huella').toBeDefined()
-    expect(staffCall!.authorization).toBe(`Bearer ${SERVICE}`)
-    expect(staffCall!.url).toContain('client_id=eq.tenantB')
+    expect(res.status).toBe(401)
+    const json = await res.json()
+    expect(json.code).toBe('biometria_no_verificada')
+    expect(json.shiftToken).toBeUndefined()
+    expect(outbound.find(c => c.url.includes('pos_staff')), 'no debe haber lookup por id').toBeUndefined()
     expect(outbound.every(c => c.apikey !== ANON)).toBe(true)
   })
 })

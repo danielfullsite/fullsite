@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withPOSAuth, unauthorized } from '@/lib/api-auth'
+import { pinGate, pinRecord } from '@/lib/pin-throttle'
 
 // Checador · POST registra entrada/salida por PIN; GET lista recientes.
 // clientId SIEMPRE se resuelve del server (withPOSAuth). Escribe con service_role
@@ -40,11 +41,34 @@ export async function POST(req: NextRequest) {
   // credentials are exactly 10 digits.
   if (!/^\d{3,10}$/.test(pin)) return Response.json({ error: 'PIN inválido' }, { status: 400 })
 
+  // Límite de intentos (revisión adversarial de PR1, N-3). Esta ruta identifica al
+  // empleado POR PIN, así que sin límite era un oráculo: cualquier shift token del
+  // tenant (un mesero) enumeraba PINs aquí y luego pedía el token del gerente en
+  // /api/pos/pin. Mismo throttle que /api/pos/pin (pin-throttle.ts, por tenant+IP), con
+  // su propio espacio de llaves para que un error tecleando en el checador no bloquee
+  // el login del POS de todo el restaurante.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const throttleKey = `timeclock:${clientId}:${ip}`
+  const gate = await pinGate(throttleKey)
+  if (!gate.allowed) {
+    return Response.json(
+      { error: 'Demasiados intentos. Espera unos minutos.' },
+      { status: 429, headers: gate.retryAfter ? { 'Retry-After': String(gate.retryAfter) } : undefined }
+    )
+  }
+
   // 1. Identificar al empleado por PIN dentro del tenant.
   const sr = await svc(`pos_staff?client_id=eq.${encodeURIComponent(clientId)}&pin=eq.${encodeURIComponent(pin)}&active=eq.true&select=id,name&limit=1`)
-  const staff = sr.ok ? await sr.json().catch(() => []) : []
-  if (!Array.isArray(staff) || staff.length === 0) return Response.json({ error: 'PIN no encontrado' }, { status: 404 })
-  const { id: staffId, name: staffName } = staff[0]
+  if (!sr.ok) return Response.json({ error: 'No se pudo verificar el PIN' }, { status: 503 })
+  let staff: unknown = null
+  try { staff = await sr.json() } catch { staff = null }
+  if (!Array.isArray(staff) || staff.length === 0) {
+    // Respuesta genérica: ni nombre ni pista de si el PIN existe en otro lado.
+    await pinRecord(throttleKey, false)
+    return Response.json({ error: 'PIN incorrecto' }, { status: 401 })
+  }
+  await pinRecord(throttleKey, true)
+  const { id: staffId, name: staffName } = staff[0] as { id: string; name: string }
 
   // 2. Determinar tipo: alterna según el último registro del empleado.
   const lr = await svc(`pos_time_clock?client_id=eq.${encodeURIComponent(clientId)}&staff_id=eq.${encodeURIComponent(staffId)}&select=type&order=ts.desc&limit=1`)

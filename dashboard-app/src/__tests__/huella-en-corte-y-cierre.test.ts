@@ -23,25 +23,27 @@ const corte = sinComentarios(readFileSync(join(process.cwd(), 'src/app/pos/corte
 const cierre = sinComentarios(readFileSync(join(process.cwd(), 'src/components/pos/CierreCajaWizard.tsx'), 'utf8'))
 const posData = sinComentarios(readFileSync(join(process.cwd(), 'src/lib/pos-data.ts'), 'utf8'))
 
-describe('La huella pide el rol al servidor, no se lo concede sola', () => {
-  it('verifyManagerHuella manda min_role y fingerprint_id a /api/pos/pin', () => {
+// ACTUALIZADO 2026-09-23 (F-01, auditoria dashboard): el servidor ya no acepta
+// `fingerprint_id` — era el UUID del empleado y nunca se verifico ninguna firma.
+// verifyManagerHuella queda suspendida: no toca la red y devuelve null, y
+// hayHuellasDadasDeAlta responde false para que el corte y el cierre no muestren un
+// boton que no puede funcionar. Las pruebas de corte/cierre de abajo siguen fijando
+// que, el dia que la huella vuelva (WebAuthn verificado en servidor), entre por el
+// MISMO embudo que el PIN.
+describe('La huella de gerente esta suspendida hasta tener WebAuthn verificado en servidor', () => {
+  it('verifyManagerHuella ya no manda fingerprint_id ni llama a /api/pos/pin', () => {
     const fn = posData.slice(posData.indexOf('export async function verifyManagerHuella'))
     const cuerpo = fn.slice(0, fn.indexOf('\n}\n'))
-    expect(cuerpo).toContain('min_role')
-    expect(cuerpo).toContain('fingerprint_id')
-    expect(cuerpo, 'debe pegarle al endpoint que valida rol').toContain('/api/pos/pin')
+    expect(cuerpo).not.toContain('fingerprint_id')
+    expect(cuerpo).not.toContain('/api/pos/pin')
+    expect(cuerpo).toMatch(/return null/)
   })
 
-  it('exige userVerification — la huella no puede saltarse con solo tener el aparato', () => {
-    const fn = posData.slice(posData.indexOf('export async function verifyManagerHuella'))
-    expect(fn.slice(0, fn.indexOf('\n}\n'))).toContain("userVerification: 'required'")
-  })
-
-  it('nunca lanza: devuelve null para que la pantalla pueda ofrecer el PIN', () => {
-    const fn = posData.slice(posData.indexOf('export async function verifyManagerHuella'))
+  it('hayHuellasDadasDeAlta responde false: el boton no aparece', () => {
+    const fn = posData.slice(posData.indexOf('export async function hayHuellasDadasDeAlta'))
     const cuerpo = fn.slice(0, fn.indexOf('\n}\n'))
-    expect(cuerpo).toContain('catch')
-    expect(cuerpo).toMatch(/catch[\s\S]{0,200}return null/)
+    expect(cuerpo).toMatch(/return false/)
+    expect(cuerpo).not.toMatch(/return true|isUserVerifyingPlatformAuthenticatorAvailable/)
   })
 })
 

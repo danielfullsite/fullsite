@@ -54,6 +54,12 @@ export async function POST(request: NextRequest) {
       if (p && p.cid === clientId && (ROLE_LVL[p.rol] || 0) >= 4) approvalMode = 'online:' + p.rol
     }
     if (!approvalMode) {
+      // Modo estricto = sólo prueba del servidor (revisión N-4 de PR1; misma regla que
+      // manager-approval.ts, con su efecto en campo documentado allí): sin token firmado
+      // de gerente+, ni `offline_approved` ni la ausencia de aprobación pasan.
+      if (process.env.POS_APPROVAL_STRICT === 'true') {
+        return Response.json({ ok: false, error: 'MANAGER_APPROVAL_REQUIRED' }, { status: 403 })
+      }
       if (offline_approved === true) {
         // `offline_approved` sigue siendo una afirmación del renderer. En el rollout
         // normal se conserva para no perder operaciones offline ya encoladas; cuando
