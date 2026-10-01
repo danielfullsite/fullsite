@@ -562,7 +562,6 @@ export default function DashboardPage() {
             }
             cargando={cargandoTurno}
           />
-          <ListaAtencion items={atencion} cargando={cargandoTurno} />
         </>
       )}
 
@@ -797,6 +796,11 @@ export default function DashboardPage() {
           />
         )
       })()}
+
+      {/* Las alertas operativas ("cosas por atender") bajan aquí, debajo del número
+          del día: antes encabezaban el dashboard y enterraban la venta —lo primero
+          que el dueño quiere ver al abrir. Mismo componente y datos, sólo reubicado. */}
+      <ListaAtencion items={atencion} cargando={cargandoTurno} />
 
       {/* Qué esperar hoy — la pieza nueva. Contesta "¿con cuánta gente abro?",
           que es la decisión que un dueño toma antes de abrir la cortina y que
