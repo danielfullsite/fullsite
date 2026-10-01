@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
   catch { return json(400, { error: "JSON inválido" }); }
 
   const guardados: Record<string, number> = {};
+  const ticketIds = new Set<number>();
   try {
     for (const clave of Object.keys(ESQUEMA)) {
       const filas = cuerpo[clave];
@@ -127,6 +128,8 @@ Deno.serve(async (req) => {
           }
         }
         for (const c of requeridas) if (r[c] === null || r[c] === undefined) throw new Error(`${clave}[${i}] sin ${c}`);
+        const ticketId = r.ticket_id;
+        if (typeof ticketId === "number" && Number.isSafeInteger(ticketId)) ticketIds.add(ticketId);
         return r;
       });
       if (limpias.length) {
@@ -204,5 +207,23 @@ Deno.serve(async (req) => {
     ultimo_latido: ahora, ...(total ? { ultimo_envio: ahora } : {}),
     ultimo_error: null, version_lector: version,
   }).eq("id", disp.id);
-  return json(200, { ok: true, guardados });
+  // La proyección es best-effort: la recepción histórica ya es durable y el cron
+  // existente la reconcilia. Un fallo aquí nunca induce al lector a repetir un lote
+  // que ya fue aceptado; se devuelve explícitamente para observabilidad.
+  let proyeccion: Record<string, unknown> = { solicitada: ticketIds.size, estado: "sin_tickets" };
+  if (ticketIds.size) {
+    try {
+      const { data, error } = await sb.rpc("fs_proyectar_historico_tickets_directo", {
+        p_client_id: disp.client_id,
+        p_fuente: disp.fuente,
+        p_ticket_ids: [...ticketIds],
+      });
+      proyeccion = error
+        ? { solicitada: ticketIds.size, estado: "pendiente_reconciliacion", codigo: error.code ?? "rpc_error" }
+        : { solicitada: ticketIds.size, estado: "ok", proyectados: data };
+    } catch {
+      proyeccion = { solicitada: ticketIds.size, estado: "pendiente_reconciliacion", codigo: "rpc_unreachable" };
+    }
+  }
+  return json(200, { ok: true, guardados, proyeccion });
 });
