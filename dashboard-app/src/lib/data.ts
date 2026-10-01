@@ -244,10 +244,37 @@ function diasDesde(fecha: string): number {
   return Math.max(0, Math.ceil((Date.now() - new Date(fecha + 'T00:00:00').getTime()) / 86400000)) + 1
 }
 
+/** Resumen diario por tenant desde la vista viva ocm_daily (rápido, ~1 fila/día).
+ *  Reemplaza la lectura pesada de 90 días de pos_orders CRUDO (~6k órdenes/~6 MB) que
+ *  excedía el timeout y tiraba el dashboard al respaldo wansoft_daily congelado. Sólo
+ *  totales por día (sin desglose de platillos/meseros). ocm_daily NO tiene location_id,
+ *  así que el camino por sucursal sigue en pos_orders. */
+async function getOcmDaily(clientSlug: string, days: number): Promise<WansoftDaily[]> {
+  if (!clientSlug || !Number.isInteger(days) || days < 0) throw new Error('OCM_REPORT_UNAVAILABLE: invalid scope or period')
+  const cutoff = nowMX()
+  cutoff.setDate(cutoff.getDate() - days)
+  const since = fmtDateMX(cutoff)
+  let rows: Record<string, unknown>[]
+  try {
+    const res = await fetchWithTimeout(`/api/dashboard/ocm-daily?client_id=${encodeURIComponent(clientSlug)}&since=${since}`, { cache: 'no-store' }, 15_000)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const body = await res.json() as { days?: unknown }
+    if (!Array.isArray(body.days)) throw new Error('invalid rows')
+    rows = body.days as Record<string, unknown>[]
+  } catch {
+    throw new Error('OCM_REPORT_UNAVAILABLE: incomplete daily read')
+  }
+  return rows.map(parseRow)
+}
+
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
   // Try pos_orders first for recent data (last 7 days) — this is the live POS data
   let posError: unknown
-  const posRecent = await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId).catch(error => { posError = error; return [] })
+  // Sin filtro de sucursal: histórico desde ocm_daily (vivo, ~1 fila/día, instantáneo).
+  // Con sucursal: ocm_daily no tiene location_id, así que se queda en pos_orders.
+  const posRecent = locationId
+    ? await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId).catch(error => { posError = error; return [] })
+    : await getOcmDaily(clientSlug, Math.min(days, 90)).catch(error => { posError = error; return [] })
   // Then get wansoft_daily for historical data
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
@@ -265,8 +292,17 @@ export async function getRecentDays(days: number = 30, clientSlug: string = getA
 export async function getLatestDay(clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily | null> {
   // Try pos_orders first — live POS data takes priority
   let posError: unknown
-  const posData = await getDashboardFromPosOrders(7, clientSlug, locationId).catch(error => { posError = error; return [] })
+  // Sin sucursal: lectura CORTA de pos_orders (hoy+ayer, ~150 filas) -> número + detalle
+  // del día, rápido. Con sucursal: ventana de 7 días como antes.
+  const posData = locationId
+    ? await getDashboardFromPosOrders(7, clientSlug, locationId).catch(error => { posError = error; return [] })
+    : await getDashboardFromPosOrders(2, clientSlug).catch(error => { posError = error; return [] })
   if (posData.length > 0) return posData[posData.length - 1]
+  // Si la lectura corta falló, el NÚMERO del día desde ocm_daily (vivo) antes que el respaldo.
+  if (!locationId) {
+    const ocm = await getOcmDaily(clientSlug, 2).catch(() => [])
+    if (ocm.length > 0) return ocm[ocm.length - 1]
+  }
   // Fallback to wansoft_daily
   const data = await sbFetch('wansoft_daily', `select=*&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=5`) as Record<string, unknown>[]
   const deduped = dedupeByFecha(data)
