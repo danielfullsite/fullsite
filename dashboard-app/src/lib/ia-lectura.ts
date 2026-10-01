@@ -103,8 +103,13 @@ export function normalizarMapa(raw: unknown): TablaMapa[] | null {
   return out
 }
 
-/** rpc ia_mapa. Nunca lanza. */
-export async function leerMapa(cred: CredencialesLectura, clientId: string, timeoutMs = 4000): Promise<LecturaMapa> {
+/** rpc ia_mapa. Nunca lanza. El timeout es un TECHO, no latencia fija: en caliente
+ * el mapa viene cacheado (<100ms); en frío ia_mapa tarda ~2–3s (escaneo de 60+ tablas)
+ * y, sumado a cold-start del serverless + red, el techo anterior de 4s se rebasaba a
+ * veces y la consulta libre quedaba apagada (el chat declinaba "no lo tengo calculado").
+ * 8s da margen sin costar latencia en el caso normal (corre en paralelo con los demás
+ * fetches y resuelve apenas el mapa llega). */
+export async function leerMapa(cred: CredencialesLectura, clientId: string, timeoutMs = 8000): Promise<LecturaMapa> {
   try {
     const res = await fetch(`${cred.sbUrl}/rest/v1/rpc/ia_mapa`, {
       method: 'POST',
