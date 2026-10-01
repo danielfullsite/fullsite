@@ -284,6 +284,13 @@ describe('finance — hoy contra el mismo día de la semana A LA MISMA HORA', ()
 })
 
 describe('fraud — lectura completa y "sin mesero" no es una persona', () => {
+  // runFraudAgent arma la ventana de 24 h con Date.now() real; los fixtures tienen
+  // fecha fija (AHORA = 2026-09-28). Sin congelar el reloj, a partir del 2026-09-30
+  // los fixtures caen fuera de la ventana y el fixture "sin mesero" se leía como 0
+  // filas (el test dependía del día en que corriera). Se fija Date.now a AHORA.
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(AHORA) })
+  afterEach(() => { vi.restoreAllMocks() })
+
   it('pagina en orden estable en vez de tomar 500 filas cualesquiera', async () => {
     const { sbGet, consultas } = fakeSb({ pos_orders: [] })
     await runFraudAgent('amalay', sbGet)
