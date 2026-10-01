@@ -11,11 +11,13 @@
 
 import { getAdminClient } from './_lib/supabase.ts'
 import { uuid, isoDate } from './_lib/utils.ts'
+import { requireDemoCredentials } from './_lib/get-session.ts'
 
 const CLIENT_ID = 'demo'
 const LOCATION_ID = 'demo-spgg'
-const DEMO_EMAIL = 'demo@fullsite.mx'
-const DEMO_PASSWORD = 'fullsite2026!'
+const DEMO_EMAIL = process.env.SEED_DEMO_EMAIL?.trim() || 'demo@fullsite.mx'
+// Contraseña del usuario demo: SOLO desde SEED_DEMO_PASSWORD (contención V-A10). Se pide
+// únicamente si hay que crear el usuario; requireDemoCredentials() falla con mensaje claro.
 
 type CheckStatus = '✅' | '⚠️ ' | '❌'
 
@@ -104,7 +106,7 @@ async function main() {
   } else {
     const { data: created, error: createErr } = await sb.auth.admin.createUser({
       email: DEMO_EMAIL,
-      password: DEMO_PASSWORD,
+      password: requireDemoCredentials().password,
       email_confirm: true,
       user_metadata: { client_id: CLIENT_ID, display_name: 'Demo — Café Central' },
     })

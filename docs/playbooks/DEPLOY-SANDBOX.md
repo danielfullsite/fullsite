@@ -3,7 +3,7 @@
 Procedimiento completo para desplegar un entorno sandbox independiente de AMALAY producción.
 
 **URL objetivo:** `https://sandbox.app.fullsite.mx/login`  
-**Usuario demo:** `owner@vantara.sandbox` / `Vantara2026!`  
+**Usuario demo:** `owner@vantara.sandbox` / `***REDACTED***` (gestor de secretos)<br>
 **Rama Git:** `sandbox/second-customer-skeleton`  
 **Tiempo estimado:** 30–45 min (sin contar propagación DNS)
 
@@ -181,7 +181,7 @@ https://sandbox.app.fullsite.mx/login
 Flujo de validación completo:
 
 - [ ] La página carga en < 3 segundos
-- [ ] Iniciar sesión como `owner@vantara.sandbox` / `Vantara2026!`
+- [ ] Iniciar sesión como `owner@vantara.sandbox` / `***REDACTED***` (gestor de secretos)
 - [ ] Dashboard carga sin errores de consola sobre AMALAY
 - [ ] POS abre con 12 mesas y menú VANTARA
 - [ ] Crear una orden: seleccionar mesa, agregar Ribeye (requiere punto de cocción), cobrar en Efectivo
@@ -216,8 +216,8 @@ Si algún paso falla, revisar la consola del browser y los logs en Vercel → pr
 
 | Usuario | Contraseña | Tenant | Rol |
 |---|---|---|---|
-| `owner@vantara.sandbox` | `Vantara2026!` | VANTARA | dueño |
-| `test@nomada.sandbox` | `Nomada2026!` | NÓMADA-MINI | dueño (test de aislamiento) |
+| `owner@vantara.sandbox` | `***REDACTED***` (gestor de secretos) | VANTARA | dueño |
+| `test@nomada.sandbox` | `***REDACTED***` (gestor de secretos) | NÓMADA-MINI | dueño (test de aislamiento) |
 
 Staff PINs (POS):
 

@@ -40,7 +40,7 @@ interface StaffMember {
   id: string
   client_id: string
   name: string
-  pin: string
+  // Sin `pin`: /api/owner/staff ya no lo devuelve (V-A18).
   role: string
   active: boolean
   created_at: string
@@ -163,20 +163,10 @@ export default function StaffPage() {
     Promise.all([fetchStaff(), fetchAudit()]).finally(() => setLoading(false))
   }, [authorized, fetchStaff, fetchAudit])
 
-  // ------ PIN uniqueness check ------
-  // Chequeo previo sólo para dar feedback inmediato. La verdad la tiene el índice único
-  // + la validación de /api/owner/staff, que corre en la misma transacción y no tiene
-  // carrera. Por eso ante la duda devuelve false: mejor dejar que la API rechace con su
-  // mensaje que bloquear un PIN válido desde el cliente.
-  async function isPinTaken(pin: string, excludeId?: string): Promise<boolean> {
-    try {
-      const res = await fetch('/api/owner/staff')
-      if (!res.ok) return false
-      const data = await res.json()
-      const rows: { id: string; pin?: string }[] = Array.isArray(data?.staff) ? data.staff : []
-      return rows.some(r => r.pin === pin && r.id !== excludeId)
-    } catch { return false }
-  }
+  // ------ PIN uniqueness ------
+  // V-A18 (2026-09-23): antes se bajaba la lista con los PINs de TODO el personal para
+  // compararlos aquí. La unicidad la decide /api/owner/staff (pinTaken + índice único) y
+  // su error ('Ese PIN ya está en uso', 409) se muestra tal cual vía staffApi → formError.
 
   // ------ Audit helper ------
   // BUG-019 cerró la RLS de pos_staff a la anon key, así que las escrituras directas
@@ -212,11 +202,6 @@ export default function StaffPage() {
       return
     }
     setFormSaving(true)
-    if (await isPinTaken(formPin)) {
-      setFormError('Este PIN ya esta en uso')
-      setFormSaving(false)
-      return
-    }
     const created = await staffApi('POST', { name: formName.trim(), pin: formPin, role: formRole })
     if (!created.ok) {
       setFormError(created.error)
@@ -251,12 +236,6 @@ export default function StaffPage() {
     }
 
     setFormSaving(true)
-
-    if (formNewPin && await isPinTaken(formNewPin, editingStaff.id)) {
-      setFormError('Este PIN ya esta en uso')
-      setFormSaving(false)
-      return
-    }
 
     const changes: Record<string, unknown> = {}
     const patch: Record<string, unknown> = {}

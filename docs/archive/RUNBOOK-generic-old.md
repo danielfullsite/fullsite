@@ -142,8 +142,8 @@ If any action touched `qjiomlvudfmzuvqvhwpk` (AMALAY production):
 
 | User | Password | Tenant | Role |
 |---|---|---|---|
-| owner@vantara.sandbox | Sandbox2026!vantara | vantara | dueño |
-| owner@nomada.sandbox | Sandbox2026!nomada | nomada-mini | dueño |
-| owner@prueba3.sandbox | Sandbox2026!prueba3 | prueba-3 | dueño |
+| owner@vantara.sandbox | `***REDACTED***` (gestor de secretos) | vantara | dueño |
+| owner@nomada.sandbox | `***REDACTED***` (gestor de secretos) | nomada-mini | dueño |
+| owner@prueba3.sandbox | `***REDACTED***` (gestor de secretos) | prueba-3 | dueño |
 
 VANTARA staff PINs: Carlos 9001, Sofia 1001, Diego 1002, Ana 1003

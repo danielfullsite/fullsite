@@ -308,7 +308,7 @@ if (req.headers['x-admin-secret'] !== adminSecret) return res.status(401).json({
 ```bash
 # If ONBOARDING_SECRET is not set in the deployment environment:
 curl -X POST /api/onboarding \
-  -d '{"email": "attacker@evil.com", "clientId": "amalay", "password": "newpass123"}'
+  -d '{"email": "attacker@evil.com", "clientId": "amalay", "password": "***REDACTED***"}'
 # → Creates a dueño-level account in any tenant on the platform
 ```
 

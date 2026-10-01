@@ -2,9 +2,9 @@ import { NextRequest } from 'next/server'
 import { requirePlatformAdmin2FA, platformServiceFetch } from '@/lib/platform-auth'
 import { auditLog } from '@/lib/platform-writes'
 
-// Control Plane · GET/PATCH /api/platform/staff — ver/editar el personal (PINs) de
-// cualquier tenant. Via service_role (cross-tenant), gateado por platform admin.
-// GET  ?client_id=X            → lista personal
+// Control Plane · GET/PATCH /api/platform/staff — ver/editar el personal de cualquier
+// tenant. Via service_role (cross-tenant), gateado por platform admin.
+// GET  ?client_id=X            → lista personal (SIN pin — V-A18)
 // PATCH { client_id, id, pin?, name?, active? } → actualiza una fila
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +12,7 @@ const CLIENT_RE = /^[a-z0-9_-]{1,40}$/i
 // 4–10: los seeds del provisioning son de 10 dígitos; con el tope viejo de 8
 // esta pantalla rechazaba los PINs que ella misma provisionó (gap Minute-0 #4).
 const PIN_RE = /^\d{4,10}$/
+const STAFF_PUBLIC_COLUMNS = ['id', 'name', 'role', 'role_display', 'active'] as const
 
 export async function GET(req: NextRequest) {
   const gate = await requirePlatformAdmin2FA(req)
@@ -19,12 +20,18 @@ export async function GET(req: NextRequest) {
   const clientId = req.nextUrl.searchParams.get('client_id') || ''
   if (!CLIENT_RE.test(clientId)) return Response.json({ error: 'client_id inválido' }, { status: 400 })
 
+  // V-A18 (2026-09-23): el PIN no sale al navegador ni para el super-admin (igual que
+  // /api/platform/export, que ya lo excluía). Cambiarlo sigue siendo posible por PATCH.
   const res = await platformServiceFetch(
-    `pos_staff?client_id=eq.${encodeURIComponent(clientId)}&select=id,name,pin,role,role_display,active&order=name`,
+    `pos_staff?client_id=eq.${encodeURIComponent(clientId)}&select=${STAFF_PUBLIC_COLUMNS.join(',')}&order=name`,
     { headers: { Accept: 'application/json' } }
   )
   if (!res.ok) return Response.json({ error: `No se pudo leer (${res.status})` }, { status: 502 })
-  const staff = await res.json().catch(() => [])
+  const rows = await res.json().catch(() => [])
+  // Allowlist al serializar: aunque la BD devolviera pin/pin_hash, no se reenvían.
+  const staff = Array.isArray(rows)
+    ? rows.map(r => Object.fromEntries(STAFF_PUBLIC_COLUMNS.map(k => [k, (r as Record<string, unknown>)?.[k] ?? null])))
+    : []
   return Response.json({ staff })
 }
 
@@ -55,6 +62,9 @@ export async function PATCH(req: NextRequest) {
     }
   )
   if (!res.ok) {
+    // La unicidad del PIN la garantiza el índice único (pin, client_id): PostgREST responde
+    // 409. Ya no hay lista de PINs en el navegador para pre-validar, así que se traduce.
+    if (res.status === 409 && 'pin' in changes) return Response.json({ error: 'Ese PIN ya está en uso' }, { status: 409 })
     const detail = await res.text().catch(() => '')
     return Response.json({ error: `No se pudo actualizar (${res.status})`, detail }, { status: 502 })
   }

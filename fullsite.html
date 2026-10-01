@@ -3177,7 +3177,9 @@ async function runSingleAgent(agentId) {
 // ============================================================
 // 🤖 AGENT ACTIONS — Ejecutan tareas reales
 // ============================================================
-const TG_TOKEN = '8682054788:AAHhqWN59aTDnc_QREC-RqwgNGNkMqbTafs';
+// Token retirado (contención 2026-09-23): era un token de bot real en HTML público.
+// Rotarlo en @BotFather; nunca en el cliente — enviar por un endpoint del servidor.
+const TG_TOKEN = '';
 
 async function sendTelegram(message) {
   const chatId = LS.get('tg_chat_id');

@@ -8,10 +8,11 @@
 // fs-at → withPOSAuth resuelve el tenant.
 
 import { useState, useEffect } from 'react'
-import { RefreshCw, Pencil, Eye, EyeOff, UserPlus, X, Check, Ban, KeyRound, Copy, Trash2, Shield } from 'lucide-react'
+import { RefreshCw, Pencil, UserPlus, X, Check, Ban, KeyRound, Copy, Trash2, Shield } from 'lucide-react'
 
 interface Staff {
-  id: string; name: string; pin: string; role: string; role_display: string | null
+  // Sin `pin`: /api/owner/staff ya no lo devuelve (V-A18). Se asigna/cambia, no se lee.
+  id: string; name: string; role: string; role_display: string | null
   active: boolean; hourly_rate: number | null; weekly_salary: number | null
 }
 interface DashUser { user_id: string; email: string; role: string; display_name: string }
@@ -45,7 +46,6 @@ export default function EquipoPage() {
 
   // Personal POS
   const [staff, setStaff] = useState<Staff[]>([])
-  const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [sForm, setSForm] = useState<StaffForm | null>(null)
   // OP-42 — tras alta rápida, mostrar el PIN una vez para que el gerente lo anote.
   const [justCreated, setJustCreated] = useState<{ name: string; pin: string; generated: boolean } | null>(null)
@@ -190,11 +190,7 @@ export default function EquipoPage() {
                   <tr key={s.id} className={`border-t border-[var(--line)] ${s.active ? '' : 'opacity-50'}`}>
                     <td className="px-4 py-3 text-[var(--text-1)] font-medium">{s.name}</td>
                     <td className="px-4 py-3"><span className={`inline-block px-2 py-0.5 rounded-md border text-xs font-medium ${roleTint(s.role)}`}>{ROLE_LABELS[s.role] || s.role}</span></td>
-                    <td className="px-4 py-3 font-mono text-[var(--text-2)]">
-                      <button onClick={() => setRevealed(p => { const n = new Set(p); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n })} className="inline-flex items-center gap-1.5 hover:text-[var(--text-1)]">
-                        {revealed.has(s.id) ? s.pin : '••••'}{revealed.has(s.id) ? <EyeOff size={12} /> : <Eye size={12} />}
-                      </button>
-                    </td>
+                    <td className="px-4 py-3 text-xs text-[var(--text-3)]">PIN asignado</td>
                     <td className="px-4 py-3"><span className={`text-xs ${s.active ? 'text-emerald-400' : 'text-[var(--text-3)]'}`}>{s.active ? 'Activo' : 'Inactivo'}</span></td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button onClick={() => { setSForm({ id: s.id, name: s.name, pin: '', role: s.role, hourly_rate: s.hourly_rate ? String(s.hourly_rate) : '', weekly_salary: s.weekly_salary ? String(s.weekly_salary) : '' }); setError('') }} className="px-2 py-1.5 rounded-md hover:bg-[var(--surface-2)] text-[var(--text-3)] hover:text-[var(--text-1)] inline-flex items-center gap-1 text-xs"><Pencil size={12} /> Editar</button>
