@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { WansoftDaily } from '@/lib/types'
 
+const { fetchWithTimeoutMock } = vi.hoisted(() => ({ fetchWithTimeoutMock: vi.fn() }))
+vi.mock('@/lib/fetch-with-timeout', () => ({
+  fetchWithTimeout: fetchWithTimeoutMock,
+}))
+
 // ─── localStorage mock ────────────────────────────────────────────────────
 
 const store: Record<string, string> = {}
@@ -15,12 +20,16 @@ vi.stubGlobal('localStorage', localStorageMock)
 // getActiveClientSlug falls back to process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID in Node env
 process.env.NEXT_PUBLIC_DEFAULT_CLIENT_ID = 'amalay'
 
-beforeEach(() => localStorageMock.clear())
+beforeEach(() => {
+  localStorageMock.clear()
+  fetchWithTimeoutMock.mockReset()
+})
 
 // ─── Import after mocking ─────────────────────────────────────────────────
 
 import {
   getActiveClientSlug,
+  getRecentDays,
   aggregatePayments,
   aggregateMeseros,
   aggregateGrupos,
@@ -51,6 +60,10 @@ function makeDaily(overrides: Partial<WansoftDaily> = {}): WansoftDaily {
   }
 }
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
 // ─── getActiveClientSlug ──────────────────────────────────────────────────
 
 describe('getActiveClientSlug', () => {
@@ -76,6 +89,30 @@ describe('getActiveClientSlug', () => {
     localStorageMock.setItem('fullsite_client_id', 'myclient')
     localStorageMock.clear()
     expect(getActiveClientSlug()).toBe('amalay')
+  })
+})
+
+describe('getRecentDays', () => {
+  it('inicia la vista viva y el respaldo histórico en paralelo', async () => {
+    let resolveLive: ((response: Response) => void) | undefined
+    fetchWithTimeoutMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.startsWith('/api/dashboard/ocm-daily')) {
+        return new Promise<Response>(resolve => { resolveLive = resolve })
+      }
+      if (url.includes('/rest/v1/wansoft_daily?')) return Promise.resolve(jsonResponse([]))
+      throw new Error(`unexpected request: ${url}`)
+    })
+
+    const pending = getRecentDays(30, 'amalay')
+    await Promise.resolve()
+
+    expect(fetchWithTimeoutMock).toHaveBeenCalledTimes(2)
+    expect(String(fetchWithTimeoutMock.mock.calls[0][0])).toContain('/api/dashboard/ocm-daily')
+    expect(String(fetchWithTimeoutMock.mock.calls[1][0])).toContain('/rest/v1/wansoft_daily?')
+
+    resolveLive?.(jsonResponse({ days: [] }))
+    await expect(pending).resolves.toEqual([])
   })
 })
 

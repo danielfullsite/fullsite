@@ -280,15 +280,19 @@ async function getOcmDaily(clientSlug: string, days: number): Promise<WansoftDai
 }
 
 export async function getRecentDays(days: number = 30, clientSlug: string = getActiveClientSlug(), locationId?: string | null): Promise<WansoftDaily[]> {
-  // Try pos_orders first for recent data (last 7 days) — this is the live POS data
+  // Las dos fuentes son independientes. Esperarlas en serie convertía una caída
+  // acotada de la vista viva (15 s) + el respaldo histórico (10 s) en hasta 25 s
+  // de "Cargando datos...". Arrancarlas juntas conserva el mismo merge y reduce
+  // la espera al más lento de ambos lectores.
   let posError: unknown
   // Sin filtro de sucursal: histórico desde ocm_daily (vivo, ~1 fila/día, instantáneo).
   // Con sucursal: ocm_daily no tiene location_id, así que se queda en pos_orders.
-  const posRecent = locationId
-    ? await getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId).catch(error => { posError = error; return [] })
-    : await getOcmDaily(clientSlug, Math.min(days, 90)).catch(error => { posError = error; return [] })
-  // Then get wansoft_daily for historical data
-  const data = await sbFetch('wansoft_daily', `select=${WANSOFT_DASHBOARD_SUMMARY_COLUMNS}&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`) as Record<string, unknown>[]
+  const posRecentRead = locationId
+    ? getDashboardFromPosOrders(Math.min(days, 90), clientSlug, locationId)
+    : getOcmDaily(clientSlug, Math.min(days, 90))
+  const posRecentPromise = posRecentRead.catch(error => { posError = error; return [] as WansoftDaily[] })
+  const historicalPromise = sbFetch('wansoft_daily', `select=${WANSOFT_DASHBOARD_SUMMARY_COLUMNS}&client_slug=eq.${clientSlug}${locationFilter(locationId)}&ventas_dia=gt.0&order=fecha.desc&limit=${days * 2}`)
+  const [posRecent, data] = await Promise.all([posRecentPromise, historicalPromise])
   const wansoftData = dedupeByFecha(data).slice(0, days).reverse().map(parseRow)
   if (posError && !wansoftData.length) throw posError
   // Merge: for dates that exist in both, prefer pos_orders (live POS data)
