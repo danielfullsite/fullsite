@@ -51,3 +51,11 @@ export function dayIsOpenForFinalDetection(
   if (!viewDate || !DATE_RE.test(viewDate) || !status || !DATE_RE.test(status.businessDate)) return true
   return viewDate >= status.businessDate || (isLatestVisibleDay && status.turnoAbierto !== null)
 }
+
+/** Una proyección de cierre sólo es válida cuando el día ya no está abierto. */
+export function canShowFinalProjection(
+  dayDate: string | null | undefined,
+  status: DashboardOperationStatus | null,
+): boolean {
+  return !dayIsOpenForFinalDetection(dayDate, status, true)
+}

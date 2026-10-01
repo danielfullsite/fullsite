@@ -10,7 +10,7 @@ import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
 import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getDashboardOperationStatus, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
-import { dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
+import { canShowFinalProjection, dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -419,6 +419,13 @@ export default function DashboardPage() {
     viewDay ? String(viewDay.fecha).slice(0, 10) : null,
     estadoOperacion,
     selectedDayIdx === 0,
+  )
+  // Las proyecciones de cierre tampoco son hechos mientras Caja tiene un
+  // turno abierto. Usamos el mismo estado que protege a los agentes, no el
+  // reloj del navegador, y cubrimos el turno que cruza medianoche.
+  const puedeMostrarProyeccionFinal = canShowFinalProjection(
+    latestDay ? String(latestDay.fecha).slice(0, 10) : null,
+    estadoOperacion,
   )
   const detecciones = detectar(recentData, viewDay, { diaAbierto })
 
@@ -850,7 +857,7 @@ export default function DashboardPage() {
           </div>
           <p className="text-[28px] sm:text-[34px] font-black tracking-[-0.03em] text-[var(--text-1)] tnum mb-1.5">{formatCurrency(monthProgress.monthVentas)}</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-3)] mb-3">
-            <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>
+            {puedeMostrarProyeccionFinal && <span>Proy. <span className="font-bold text-[var(--accent-ink)] tnum">{formatCurrency(monthProgress.projected)}</span></span>}
             <span>Prom. <span className="font-semibold text-[var(--text-2)] tnum">{formatCurrency(monthProgress.dailyAvg)}</span>/día</span>
             <span className="hidden sm:inline">{monthProgress.daysLeft} días restantes</span>
           </div>
@@ -866,7 +873,7 @@ export default function DashboardPage() {
       {/* KPI Summary Cards — 4 across like Toast */}
 
       {/* Prediction Widget */}
-      {show('prediction') && period === 'dia' && (() => {
+      {show('prediction') && period === 'dia' && puedeMostrarProyeccionFinal && (() => {
         const today = latestDay?.fecha || ''
         const todayDate = today ? new Date(today + 'T12:00:00') : new Date()
         const todayDow = todayDate.getDay()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { businessDateAt, dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
+import { businessDateAt, canShowFinalProjection, dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
 
 const cerrado: DashboardOperationStatus = { businessDate: '2026-10-01', turnoAbierto: null }
 const abierto: DashboardOperationStatus = {
@@ -28,5 +28,11 @@ describe('día de negocio del servidor', () => {
 
   it('falla cerrado cuando no existe estado operativo verificable', () => {
     expect(dayIsOpenForFinalDetection('2026-09-30', null, true)).toBe(true)
+  })
+
+  it('no presenta proyecciones finales para el turno abierto, ni aun tras medianoche', () => {
+    expect(canShowFinalProjection('2026-10-01', abierto)).toBe(false)
+    expect(canShowFinalProjection('2026-09-30', abierto)).toBe(false)
+    expect(canShowFinalProjection('2026-09-30', cerrado)).toBe(true)
   })
 })
