@@ -19,7 +19,7 @@ Asegurar que los proveedores de servicios de Fullsite cumplan con estandares de 
 | **Supabase** | Base de datos, autenticacion | Todos los datos de clientes | SOC 2 Type II | Critico |
 | **Vercel** | Hosting, CDN, deployments | Codigo fuente, assets estaticos | SOC 2 | Alto |
 | **Cloudflare** | DNS, WAF, DDoS protection | Trafico de red (no datos en reposo) | SOC 2, ISO 27001, PCI-DSS | Alto |
-| **Anthropic** | API de IA (Claude) | Datos operativos en sesion (zero-retention) | SOC 2 | Medio |
+| **Anthropic** | API de IA (Claude) | Datos operativos en sesion; retencion segun contrato — ver [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) | SOC 2 | Medio |
 | **GitHub** | Repositorio de codigo, CI/CD | Codigo fuente, secrets (encriptados) | SOC 2 | Alto |
 | **Stripe/Clip/MercadoPago** | Procesamiento de pagos | Tokens de pago (no datos de tarjeta) | PCI-DSS | Alto |
 | **Groq** | API de LLM (agentes) | Datos operativos en sesion | En evaluacion | Medio |
