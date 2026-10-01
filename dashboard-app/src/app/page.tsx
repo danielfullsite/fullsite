@@ -8,8 +8,9 @@ import { DollarSign, TrendingDown, TrendingUp, Award, ArrowRight, CreditCard, Fi
 import RevenueChart from '@/components/RevenueChart'
 import RevenueDistributionChart from '@/components/RevenueDistributionChart'
 import { getActiveTimezone } from '@/lib/date-mx'
-import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getTurnoAbierto, type TurnoAbierto } from '@/lib/data'
+import { getRecentDays, getLatestDay, getDashboardFromPosOrders, aggregateMeseros, getDeteccionesAgentes, getDashboardOperationStatus, type TurnoAbierto } from '@/lib/data'
 import { desdeEventos, type Atencion } from '@/lib/atencion'
+import { dayIsOpenForFinalDetection, type DashboardOperationStatus } from '@/lib/business-day'
 import EstadoOperacion from '@/components/dashboard/EstadoOperacion'
 import ResumenDia from '@/components/dashboard/ResumenDia'
 import QuienVendio from '@/components/dashboard/QuienVendio'
@@ -159,20 +160,23 @@ export default function DashboardPage() {
   const [atencion, setAtencion] = useState<Atencion[]>([])
   const [turnoAbierto, setTurnoAbierto] = useState<TurnoAbierto | null>(null)
   const [cargandoTurno, setCargandoTurno] = useState(true)
+  const [estadoOperacion, setEstadoOperacion] = useState<DashboardOperationStatus | null>(null)
 
   useEffect(() => {
+    if (!clientId) return
     let vivo = true
     Promise.all([
       getDeteccionesAgentes().catch(() => []),
-      getTurnoAbierto().catch(() => null),
-    ]).then(([eventos, turno]) => {
+      getDashboardOperationStatus(clientId).catch(() => null),
+    ]).then(([eventos, estado]) => {
       if (!vivo) return
       setAtencion(desdeEventos(eventos))
-      setTurnoAbierto(turno)
+      setEstadoOperacion(estado)
+      setTurnoAbierto(estado?.turnoAbierto ?? null)
       setCargandoTurno(false)
     })
     return () => { vivo = false }
-  }, [])
+  }, [clientId])
 
   // Load widget config from localStorage
   useEffect(() => { setWidgets(loadWidgetConfig()) }, [])
@@ -411,7 +415,12 @@ export default function DashboardPage() {
   // amalay y de boruca y CERO de coffee-shop, y el bloque que las leía acabó
   // enseñando las alertas de AMALAY aquí (P0 corregido aparte). `recentData` ya
   // viene acotado al tenant activo, así que no hay forma de que se crucen.
-  const detecciones = detectar(recentData, viewDay)
+  const diaAbierto = dayIsOpenForFinalDetection(
+    viewDay ? String(viewDay.fecha).slice(0, 10) : null,
+    estadoOperacion,
+    selectedDayIdx === 0,
+  )
+  const detecciones = detectar(recentData, viewDay, { diaAbierto })
 
   // Ritmo por día de la semana. Sale de `recentData`, que la página ya tiene:
   // no hay una consulta nueva. El patrón más fuerte de una cafetería es el día

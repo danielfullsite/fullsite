@@ -110,6 +110,16 @@ describe('detectar — la venta contra sus mismos días', () => {
     expect(d.severidad).toBe('info')
     expect(d.impacto).toBeGreaterThan(0)
   })
+
+  it('un acumulado de turno abierto no se presenta como un cierre', () => {
+    const abiertas = detectar([...VIERNES, EL_24], EL_24, { diaAbierto: true })
+    expect(abiertas).toEqual([])
+  })
+
+  it('un día histórico confirmado como cerrado conserva su comparación', () => {
+    const cerradas = detectar([...VIERNES, EL_24], EL_24, { diaAbierto: false })
+    expect(cerradas.some(d => d.id.startsWith('venta-vs-dia'))).toBe(true)
+  })
 })
 
 describe('detectar — concentración en una persona', () => {

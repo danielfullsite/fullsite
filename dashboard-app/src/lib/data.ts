@@ -2,6 +2,7 @@ import type { WansoftDaily } from './types'
 import { supabase } from './supabase'
 import { nowMX, fmtDateMX } from './date-mx'
 import { fetchWithTimeout } from './fetch-with-timeout'
+import type { DashboardOperationStatus } from './business-day'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -864,6 +865,27 @@ export interface TurnoAbierto {
   abiertoPor: string | null
   abiertoAt: string | null
   fondoInicial: number | null
+}
+
+/** Estado operativo emitido por el servidor: día de negocio + turno abierto. */
+export async function getDashboardOperationStatus(
+  clientSlug: string = getActiveClientSlug(),
+): Promise<DashboardOperationStatus> {
+  if (!clientSlug) throw new Error('DASHBOARD_OPERATION_STATUS_UNAVAILABLE: missing client')
+  try {
+    const res = await fetchWithTimeout(
+      `/api/dashboard/operation-status?client_id=${encodeURIComponent(clientSlug)}`,
+      { cache: 'no-store' },
+      10_000,
+    )
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const body = await res.json() as DashboardOperationStatus
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.businessDate)) throw new Error('invalid business date')
+    if (body.turnoAbierto !== null && typeof body.turnoAbierto?.id !== 'string') throw new Error('invalid open turn')
+    return body
+  } catch {
+    throw new Error('DASHBOARD_OPERATION_STATUS_UNAVAILABLE')
+  }
 }
 
 /**
