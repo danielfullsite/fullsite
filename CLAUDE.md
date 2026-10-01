@@ -42,6 +42,12 @@ o `lib/agents/*`.** (`api/predict` y los agentes de Python aún leen legacy — 
 
 Esquema de las tablas legacy: [`docs/knowledge/wansoft/TABLAS-LEGACY.md`](docs/knowledge/wansoft/TABLAS-LEGACY.md).
 
+**El dashboard del dueño** lee el histórico de `ocm_daily` (rápido) y el día de una
+lectura corta de `pos_orders`; nunca 90 días crudos, nunca `wansoft_daily` como hoy. El
+flujo de datos del dashboard, el cron `fs-sync-pos-orders` (sólo tenants espejo) y los
+pendientes están en [`docs/ai/DASHBOARD-RESUMEN-DIA.md`](docs/ai/DASHBOARD-RESUMEN-DIA.md).
+**Léelo antes de tocar `lib/data.ts`, `api/dashboard/*` o `public/sw.js`.**
+
 
 ## Slash commands disponibles
 
