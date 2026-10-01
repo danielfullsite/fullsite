@@ -197,16 +197,22 @@ export default function DashboardPage() {
         // agentes, que se movió a Herramientas → Agentes IA. Era una consulta a
         // telemetría GLOBAL de la plataforma en cada carga del dashboard de cada
         // restaurante, y ninguno la usaba para decidir nada.
+        // AuthContext auto-selecciona la 1ra sucursal al cargar, asi que un tenant
+        // de UNA sola sucursal (p.ej. amalay) siempre mandaba location_id -> el camino
+        // rapido de ocm_daily (que no tiene location_id) nunca se activaba y el dashboard
+        // leia 90 dias de pos crudo -> timeout -> respaldo wansoft congelado. El filtro
+        // de sucursal solo tiene sentido con 2+: con una, consolidado == esa sucursal.
+        const dashLoc = locations.length > 1 ? locationId : null
         const [recentRaw, latestRaw] = await Promise.all([
-          getRecentDays(1000, clientId || undefined, locationId),
-          getLatestDay(clientId || undefined, locationId),
+          getRecentDays(1000, clientId || undefined, dashLoc),
+          getLatestDay(clientId || undefined, dashLoc),
         ])
         let recent = recentRaw
         let latest = latestRaw
 
         // Fallback: if no wansoft_daily data, build from pos_orders
         if (recent.length === 0) {
-          recent = await getDashboardFromPosOrders(30, clientId || undefined, locationId)
+          recent = await getDashboardFromPosOrders(30, clientId || undefined, dashLoc)
           latest = recent.length > 0 ? recent[recent.length - 1] : null
         }
 
