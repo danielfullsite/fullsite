@@ -33,6 +33,7 @@ describe('GET /api/dashboard/pos-daily', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.orders).toHaveLength(5107)
+    expect(res.headers.get('cache-control')).toContain('no-store')
     expect(fetchMock).toHaveBeenCalledTimes(6) // 1000*5 + 107
     for (const [url] of fetchMock.mock.calls) {
       const p = new URL(url)
@@ -48,6 +49,7 @@ describe('GET /api/dashboard/pos-daily', () => {
   it('400 si falta since válido', async () => {
     const res = await GET(req('client_id=restaurant-a'))
     expect(res.status).toBe(400)
+    expect(res.headers.get('cache-control')).toContain('no-store')
   })
   it('502 ante una falla a media lectura (no devuelve parcial)', async () => {
     fetchMock

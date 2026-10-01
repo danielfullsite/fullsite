@@ -15,13 +15,16 @@ const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 // requireTenant (sesión → client_id server-side), no un header del cliente.
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 
+// Nunca cachear (ni navegador, ni CDN, ni SW): es el resumen de ventas en vivo.
+const NO_STORE = { 'Cache-Control': 'no-store' } as const
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const PAGE = 1000
 const MAX_PAGES = 60 // 60k órdenes tope duro, evita un bucle infinito
 
 export async function GET(request: NextRequest) {
   if (!SB_KEY) {
-    return NextResponse.json({ error: 'server misconfigured: SUPABASE_SERVICE_KEY required' }, { status: 503 })
+    return NextResponse.json({ error: 'server misconfigured: SUPABASE_SERVICE_KEY required' }, { status: 503, headers: NO_STORE })
   }
   const sp = request.nextUrl.searchParams
   const auth = await requireTenant(request, sp.get('client_id'))
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const since = sp.get('since') || ''
   if (!DATE_RE.test(since)) {
-    return NextResponse.json({ error: 'since (YYYY-MM-DD) required' }, { status: 400 })
+    return NextResponse.json({ error: 'since (YYYY-MM-DD) required' }, { status: 400, headers: NO_STORE })
   }
   const locationId = sp.get('location_id')
 
@@ -75,8 +78,8 @@ export async function GET(request: NextRequest) {
     }
   } catch {
     // Falla ≠ vacío: se reporta, no se convierte en lista vacía silenciosa.
-    return NextResponse.json({ error: 'POS_REPORT_UNAVAILABLE: incomplete order read' }, { status: 502 })
+    return NextResponse.json({ error: 'POS_REPORT_UNAVAILABLE: incomplete order read' }, { status: 502, headers: NO_STORE })
   }
 
-  return NextResponse.json({ orders })
+  return NextResponse.json({ orders }, { headers: NO_STORE })
 }
