@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { nowMX, fmtDateMX } from './date-mx'
 import { fetchWithTimeout } from './fetch-with-timeout'
 import type { DashboardOperationStatus } from './business-day'
+import type { IntradayRhythm } from './intraday-rhythm'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -890,6 +891,26 @@ export async function getDashboardOperationStatus(
     return body
   } catch {
     throw new Error('DASHBOARD_OPERATION_STATUS_UNAVAILABLE')
+  }
+}
+
+/** Ritmo real al corte servidor; null cuando no hay muestra o la lectura falla. */
+export async function getDashboardIntradayRhythm(
+  clientSlug: string = getActiveClientSlug(),
+): Promise<IntradayRhythm | null> {
+  if (!clientSlug) return null
+  try {
+    const res = await fetchWithTimeout(
+      `/api/dashboard/intraday-rhythm?client_id=${encodeURIComponent(clientSlug)}`,
+      { cache: 'no-store' },
+      10_000,
+    )
+    if (!res.ok) return null
+    const body = await res.json() as { ritmo?: IntradayRhythm | null }
+    if (!body.ritmo || !/^\d{4}-\d{2}-\d{2}$/.test(body.ritmo.businessDate)) return null
+    return body.ritmo
+  } catch {
+    return null
   }
 }
 

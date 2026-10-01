@@ -1,4 +1,5 @@
 import type { WansoftDaily } from '@/lib/types'
+import type { IntradayRhythm } from '@/lib/intraday-rhythm'
 
 /**
  * Detecciones de los agentes, calculadas del historial del propio restaurante.
@@ -339,6 +340,50 @@ export function detectar(
     // A misma gravedad, primero lo que más dinero mueve.
     return Math.abs(b.impacto ?? 0) - Math.abs(a.impacto ?? 0)
   })
+}
+
+/**
+ * Señal de turno abierto. Es deliberadamente un contrato separado: jamás usa
+ * una venta diaria completa ni estima el final del día.
+ */
+export function detectarRitmoIntraDia(ritmo: IntradayRhythm | null): Deteccion | null {
+  if (!ritmo || ritmo.comparableDays < MUESTRA_MINIMA || ritmo.expectedTotal <= 0) return null
+  const cambio = (ritmo.currentTotal - ritmo.expectedTotal) / ritmo.expectedTotal
+  if (Math.abs(cambio) < UMBRAL_CAMBIO) return null
+  const cae = cambio < 0
+  const corte = ritmo.cutOffTime
+  const actual = Math.round(ritmo.currentTotal)
+  const esperado = Math.round(ritmo.expectedTotal)
+  return {
+    id: `ritmo-intradia-${ritmo.businessDate}-${ritmo.cutOffMinutes}`,
+    agente: 'Ritmo a esta hora',
+    agenteQueHace: 'Compara sólo lo ya cobrado a esta misma hora contra tus días equivalentes cerrados',
+    verbo: cae ? 'Revísalo' : 'Captúralo',
+    linea: cae
+      ? `a esta hora vas ${pct(cambio)} abajo del ritmo de tus días comparables`
+      : `a esta hora vas ${pct(cambio)} arriba del ritmo de tus días comparables`,
+    pushTitulo: cae ? 'Ritmo más lento a esta hora' : 'Ritmo más fuerte a esta hora',
+    pushCuerpo: cae
+      ? `Al corte ${corte} llevas ${dinero(actual)}; tus ${ritmo.comparableDays} días comparables llevaban ${dinero(esperado)}.`
+      : `Al corte ${corte} llevas ${dinero(actual)}; tus ${ritmo.comparableDays} días comparables llevaban ${dinero(esperado)}.`,
+    // La diferencia es al corte actual. No es una pérdida ni una proyección de cierre.
+    impacto: null,
+    impactoNota: 'Diferencia al corte actual; no es proyección de cierre.',
+    severidad: cae ? (Math.abs(cambio) >= 0.4 ? 'alta' : 'media') : 'info',
+    queAnalizo: [
+      `Cobros cerrados hasta ${corte} del día de negocio actual.`,
+      `${ritmo.comparableDays} días del mismo día de la semana, medidos al mismo corte.`,
+      `Hoy: ${dinero(actual)}. Ritmo histórico al corte: ${dinero(esperado)}.`,
+    ],
+    evidencia: [
+      { etiqueta: 'Ritmo comparable', valor: esperado },
+      { etiqueta: 'Hoy al corte', valor: actual, foco: true },
+    ],
+    evidenciaNota: `Comparación hasta ${corte}. No calcula ni promete el cierre del día.`,
+    recomendacion: cae
+      ? 'Mira qué está pasando ahora: afluencia, mesas abiertas, tiempos de cocina o canal de ventas. Vuelve a revisar más tarde; el cierre sigue abierto.'
+      : 'Identifica qué está funcionando a esta hora y sosténlo. El cierre del día aún no está determinado.',
+  }
 }
 
 /** El saludo, según la hora y cuántas cosas hay. Nunca "0 cosas" ni "1 cosas". */
