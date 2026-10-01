@@ -221,3 +221,96 @@ export async function loadInventoryWithStock(clientId: string): Promise<{
       }
     })
 }
+
+// ── Consumo teórico (Contrato Capa 1) ─────────────────────────────────────
+//
+// El lado IZQUIERDO del cruce consumo × venta: qué DEBIÓ consumirse según lo vendido.
+// Lo calcula la vista `ops_consumo` con la MISMA definición que usa la deducción de
+// stock (pos_recipe_versions activa + pos_recipe_lines), así que se puede comparar
+// contra `pos_inventory_movements` sin estar midiendo la diferencia entre dos
+// definiciones. Ver docs/ai/ARQUITECTURA-CRUCE.md.
+
+export interface CoberturaRecetas {
+  lineasVendidas: number
+  lineasConReceta: number
+  pctLineasConReceta: number | null
+  importeVendido: number
+  pctImporteConReceta: number | null
+  platillosSinReceta: number
+}
+
+export interface ConsumoDelDia {
+  diaVenta: string
+  /** ingredient_id → consumo teórico en la unidad de stock del insumo. */
+  porIngrediente: Map<string, number>
+  /** Renglones que la vista no pudo convertir a unidad de stock. Un consumo bajo y un
+   *  "no se pudo calcular" se ven igual si no se cuentan aparte. */
+  lineasNoConvertibles: number
+  cobertura: CoberturaRecetas | null
+}
+
+/**
+ * Consumo teórico del último día de venta CON ventas, y qué tan completa es su receta.
+ *
+ * El día NO se calcula aquí. `dia_venta` es una columna que la base ya resuelve con la
+ * zona y el corte del tenant; recalcularla en el cliente reintroduciría el bug de zona
+ * horaria que costó un PR entero (#335). Se le pregunta a la vista cuál fue el último
+ * día y se usa ése.
+ *
+ * Devuelve null cuando el tenant no tiene nada que cruzar (sin recetas activas o sin
+ * ventas). null es distinto de cero: "no se puede calcular" no es "no se consumió".
+ */
+export async function loadConsumoDelDia(clientId: string): Promise<ConsumoDelDia | null> {
+  const covRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/ops_consumo_cobertura?client_id=eq.${clientId}` +
+      `&order=dia_venta.desc&limit=1` +
+      `&select=dia_venta,lineas_vendidas,lineas_con_receta,pct_lineas_con_receta,` +
+      `importe_vendido,pct_importe_con_receta,platillos_sin_receta`,
+    { headers: headers() }
+  )
+  if (!covRes.ok) return null
+  const covRows = await covRes.json()
+  if (!Array.isArray(covRows) || covRows.length === 0) return null
+
+  const c = covRows[0]
+  const diaVenta: string = c.dia_venta
+  if (!diaVenta) return null
+
+  const consRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/ops_consumo?client_id=eq.${clientId}` +
+      `&dia_venta=eq.${diaVenta}&limit=2000` +
+      `&select=ingredient_id,consumo_stock,lineas_no_convertibles`,
+    { headers: headers() }
+  )
+  if (!consRes.ok) return null
+  const consRows: { ingredient_id: string; consumo_stock: string | number | null; lineas_no_convertibles: number | null }[] =
+    await consRes.json()
+
+  // PostgREST devuelve `numeric` como STRING. Sumar sin convertir concatena.
+  const porIngrediente = new Map<string, number>()
+  let lineasNoConvertibles = 0
+  for (const r of consRows) {
+    lineasNoConvertibles += Number(r.lineas_no_convertibles) || 0
+    // `consumo_stock` en null = no se pudo convertir a unidad de stock. NO se cuenta
+    // como cero: se queda fuera y se delata en `lineasNoConvertibles`.
+    if (r.consumo_stock == null) continue
+    const qty = Number(r.consumo_stock)
+    if (!Number.isFinite(qty)) continue
+    porIngrediente.set(r.ingredient_id, (porIngrediente.get(r.ingredient_id) || 0) + qty)
+  }
+
+  const pct = (v: unknown) => (v == null ? null : Number(v))
+  return {
+    diaVenta,
+    porIngrediente,
+    lineasNoConvertibles,
+    cobertura: {
+      lineasVendidas: Number(c.lineas_vendidas) || 0,
+      lineasConReceta: Number(c.lineas_con_receta) || 0,
+      pctLineasConReceta: pct(c.pct_lineas_con_receta),
+      importeVendido: Number(c.importe_vendido) || 0,
+      pctImporteConReceta: pct(c.pct_importe_con_receta),
+      platillosSinReceta: Number(c.platillos_sin_receta) || 0,
+    },
+  }
+}
