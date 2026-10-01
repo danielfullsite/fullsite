@@ -1,102 +1,107 @@
--- ocm_daily: desglose efectivo/tarjeta por los pagos reales del ticket, no por la primera forma de pago.
+-- ocm_daily: desglose de la venta por los pagos reales del ticket, con "no determinado" explícito.
 --
 -- PENDIENTE DE AUTORIZACIÓN DE DANIEL. Es DDL sobre producción (una función nueva y un
--- CREATE OR REPLACE VIEW). No aplicar sin probarlo antes en staging con
--- supabase/tests/ocm_daily_desglose_pagos_test.sql.
+-- CREATE OR REPLACE VIEW que AGREGA 4 columnas al final). No aplicar sin probarlo antes en
+-- PostgreSQL aislado/staging con supabase/tests/ocm_daily_desglose_pagos_test.sql y
+-- supabase/tests/ocm_daily_acceso_test.sql.
 --
 -- CAUSA RAÍZ (leída en sólo lectura el 2026-10-01)
 -- ------------------------------------------------
 -- La parte `live` de public.ocm_daily clasifica cada ticket completo con
 -- `pos_orders.metodo_pago`, que para los tickets importados del espejo (`wh-<ticket_id>`)
--- es la PRIMERA forma de pago (fs_sync_pos_orders_desde_historico: array_agg(forma_pago
--- ORDER BY pago_id)[1]), y le asigna el `total` COMPLETO:
+-- es la PRIMERA forma de pago, y le asigna el `total` COMPLETO:
 --     efectivo = sum(total) FILTER (metodo_pago ~~* '%efec%' AND !~~* '%tarj%')
---     tarjeta  = sum(total) FILTER (metodo_pago ~~* '%tarj%' AND !~~* '%efec%')
--- En un pago mixto el ticket entero cae en un solo cajón. El total del día sí cuadra;
--- el desglose no.
+-- En un pago mixto el ticket entero cae en un solo cajón. El total del día cuadra; el
+-- desglose no. AMALAY, día de venta 2026-09-30 (73 tickets, $49,761.00):
+--     vista actual ... efectivo $14,637.00 / tarjeta $30,663.00
+--     corte NetSilver  efectivo $13,863.00 / tarjeta $31,437.00 (apps $4,461.00 en ninguno)
+-- Evidencia y consultas: docs/wansoft/atlas/ (rama docs/atlas-evidencia-pagos).
 --
--- Medido contra producción para AMALAY, día de venta 2026-09-30 (73 tickets, $49,761.00):
---     vista actual ......... efectivo $14,637.00 / tarjeta $30,663.00
---     por pagos reales ..... efectivo $13,863.00 / tarjeta $31,437.00 (apps $4,461.00 en ninguno)
---     diferencia ........... +$774.00 en efectivo, -$774.00 en tarjeta (simétrica)
--- Los valores corregidos coinciden al centavo con CortesPagosRegistros (PorVenta) de
--- NetSilver el 29 y el 30/09. Evidencia y consultas: docs/wansoft/atlas/ (rama
--- docs/atlas-evidencia-pagos).
+-- QUÉ SE SABE DE LA FUENTE (leído en producción el 2026-10-01)
+-- ------------------------------------------------------------
+--   * pos_orders.pagos[] sólo trae {metodo, monto}. NO trae propina ni cambio por pago, en
+--     ningún tenant (llaves distintas medidas en 60 días: metodo, monto).
+--   * historico_pagos (espejo AMALAY, fuente wansoft) SÍ conserva `propina` por pago, pero
+--     no `cambio`; el sync no la copia a pos_orders.pagos.
+--   * La semántica de `monto` NO es uniforme: espejo = monto con propina y cambio
+--     (sum(monto) = total + propina + cambio); lab-resto, tekila-rg y diezmex-demo tienen
+--     sum(monto) = total; el escritor nativo documenta total + propina (pos/page.tsx:4007,
+--     pos-data.ts:1660) pero los datos no lo cumplen. La igualdad aritmética no prueba la
+--     semántica, así que ESTA REGLA NO LA SUPONE.
+--   * Ambigüedad conocida: de 18 tickets AMALAY con tarjeta y propina en transferencia, en 10
+--     la propina está sólo en la transferencia, en 0 sólo en la tarjeta y en 8 en ambas.
+--     Restar la propina de la tarjeta "porque cabe" habría estado mal en 10 de 18.
 --
--- POR QUÉ NO SE COPIA LA REGLA DE AMALAY TAL CUAL
--- -----------------------------------------------
--- La semántica de `pos_orders.pagos[].monto` NO es la misma en todos los orígenes
--- (últimos 60 días, cerradas):
---   * espejo AMALAY: monto de tarjeta INCLUYE propina y monto de efectivo INCLUYE cambio
---     (sum(monto) = total + propina + cambio).
---   * lab-resto, tekila-rg, diezmex-demo (nativos): sum(monto) = total en el 100% de sus
---     tickets; la propina va aparte y no hay cambio.
---   * demo (nativo): 308 de 322 con sum(monto) = total + propina.
--- Restar la propina de cada tarjeta "porque sí" dejaría mal a los nativos.
+-- REGLA (fs_desglose_pago): sólo reparte lo que es demostrable con los datos de la fila
+-- ---------------------------------------------------------------------------------------
+-- Clases de pago por nombre: efectivo (efec, sin tarj), tarjeta (tarj, sin efec), otros (todo
+-- lo demás: transferencia, apps, "Dólares", "American Express", NetPay, etc.).
+-- Con pagos válidos (array no vacío, montos numéricos >= 0, suma > 0), sea S = sum(monto),
+-- T = total, P = propina del ticket, E = max(S - T, 0):
+--   1. S = T ............................. cada clase con su monto. (No importa si el monto
+--                                          era bruto o neto: nada que repartir.)
+--   2. E > 0 y una sola clase con monto .. esa clase = T (propina y cambio salen de ese mismo
+--                                          cajón, no hay nada que repartir entre clases).
+--   3. E > 0, P = 0, el efectivo cubre E . E es cambio (sólo se da cambio en efectivo):
+--                                          efectivo = monto_efectivo - E.
+--   4. S < T, P = 0 ...................... clases con su monto; lo que falta = no_determinado.
+--   5. Cualquier otro caso ............... no_determinado = T. Incluye tarjeta+transferencia
+--                                          con propina, efectivo+tarjeta con E > 0 y P > 0,
+--                                          y subcobro con propina. La propina y el cambio no
+--                                          se asignan a ninguna clase por descarte.
+-- Sin pagos (nulo, no-array o arreglo vacío):
+--   * metodo_pago declarado con una sola clase: el ticket va a esa clase ("declarado": es el
+--     único dato disponible, no un detalle verificado);
+--   * metodo_pago nulo, vacío o con efectivo Y tarjeta: no_determinado = T.
+-- Con pagos pero inválidos (monto no numérico o negativo, suma 0): no_determinado = T; no se
+-- confía en metodo_pago cuando el detalle existe y está corrupto.
+-- En todos los casos efectivo + tarjeta + otros_medios + no_determinado = total (por ticket y
+-- por día). `excedente_pagos` = max(S - T, 0) = propina incluida + cambio, SIN repartir entre
+-- ambos; la propina sigue en `propinas_total` (Σ pos_orders.propina) y no se mezcla en ventas.
 --
--- REGLA (fs_desglose_pago), sin supuestos por tenant ni por prefijo de id
--- -----------------------------------------------------------------------
---   exceso   = max(sum(monto) - total, 0)
---   propina_incluida = min(propina, exceso)        -- lo que explica la propina
---   cambio   = exceso - propina_incluida           -- el resto es cambio
---   efectivo = monto_efectivo - cambio
---   tarjeta  = monto_tarjeta  - propina_incluida
--- Sólo se aplica cuando el ticket queda EXPLICADO por esas dos formas:
---   hay pagos, sum(monto) >= total, TODOS los pagos son efectivo o tarjeta,
---   la propina incluida cabe en tarjeta y el cambio cabe en efectivo.
--- En cualquier otro caso (sin pagos, pagos no-array, apps/transferencia mezcladas, propina
--- sin tarjeta, subcobro) se conserva EXACTAMENTE el comportamiento anterior (primera forma
--- de pago x total). La propina NO se generaliza a transferencia ni a apps: sólo está
--- verificada contra el corte para tarjetas. En el histórico de AMALAY hay 87 tickets con
--- propina en transferencia y 18 de ellos también traen tarjeta; si la propina de un ticket
--- así cabe en la tarjeta, esta regla la restaría de la tarjeta aunque fuera de la
--- transferencia. Es un límite conocido: resolverlo exige propina por pago dentro de
--- pos_orders.pagos (cambio en el sync + backfill), fuera de este cambio mínimo.
+-- Este diseño no necesita saber si el tenant es espejo o nativo: usa sólo los casos en los que
+-- el reparto es el mismo bajo cualquier semántica. El costo es que los tickets mixtos con
+-- propina y excedente quedan "no determinado" hasta que la fuente traiga la propina por pago.
+-- Cómo resolverlos (NO incluido; requiere autorización): (a) que el sync copie
+-- historico_pagos.propina a pos_orders.pagos[] y backfill del histórico, o (b) que el escritor
+-- nativo registre propina y cambio por pago.
 --
--- EFECTO MEDIDO EN PRODUCCIÓN (lectura, ejecutando el cuerpo exacto de la función por
--- tickets cerrados de los últimos 60 días; el 2026-10-01):
---   * amalay 2026-09-30: efectivo 14,637.00 -> 13,863.00; tarjeta 30,663.00 -> 31,437.00
---   * amalay 2026-09-29: efectivo 19,273.50 -> 11,353.30; tarjeta 22,321.50 -> 30,241.70
---     (ambos coinciden con PorVenta del corte de NetSilver)
---   * amalay 60 días: 467 de 5,940 tickets cambian de cajón.
---   * lab-resto, demo, diezmex-demo, boruca, chickin-demo, scyf-demo: 0 tickets cambian.
---   * tekila-rg: 3,387 de 3,387 tickets cambian porque su `metodo_pago` es NULL en todos:
---     hoy su vista muestra efectivo 0 y tarjeta 0 y pasaría a mostrar el reparto real leído
---     de `pagos`. Es una corrección, pero es un cambio visible que Daniel debe conocer.
+-- COLUMNAS NUEVAS (al final de ocm_daily; las existentes conservan nombre, tipo y orden)
+-- ------------------------------------------------------------------------------------
+--   otros_medios        numeric  venta pagada con transferencia/apps/otros
+--   no_determinado      numeric  venta cuyo cajón no es demostrable con la fila
+--   excedente_pagos     numeric  propina incluida + cambio, sin repartir
+--   tickets_no_determinado integer  tickets con no_determinado <> 0
+-- Las filas históricas (ops_daily) devuelven NULL en las cuatro. `efectivo` y `tarjeta` pasan a
+-- significar "demostrado"; ya no son "lo que quedó".
 --
--- Equivalencia con la vista anterior donde no hay mezcla: para un ticket de una sola
--- forma (efectivo o tarjeta) con o sin propina incluida, el resultado es igual a `total`,
--- que es lo que la vista daba antes.
+-- EFECTO MEDIDO EN PRODUCCIÓN: ver docs/wansoft/atlas/EVIDENCIA-DESGLOSE-PAGOS-2026-09-30.md
+-- sección "Implementación propuesta" (cifras de la v2, medidas en sólo lectura).
+-- tekila-rg (demo, metodo_pago NULL en todos sus tickets) pasa de 0/0 a su reparto real:
+-- cambio visible aceptado por Daniel el 2026-10-01; no autoriza aplicar.
 --
 -- ALCANCE (un P0 por PR)
 -- ----------------------
--- Cambia: función public.fs_desglose_pago y vista public.ocm_daily (mismas columnas, tipos y
--- orden; security_invoker se conserva y se reafirma).
--- NO cambia, por separado y con su razón en la descripción del PR:
---   * public.fs_ventas_diarias (mismo patrón en las columnas ef/tj): función grande; se
---     corrige con esta misma función en una migración aparte para revisarla sola.
---   * dashboard-app/src/lib/pos-daily.ts (respaldo en JS, sólo si falla el RPC): requiere
---     leer `pagos` y `propina` y su propia prueba.
---   * Pantallas POS (pos/turno, CierreCajaWizard, control-efectivo, pos-arqueo): leen su
---     propio turno; auditar aparte.
+-- Cambia: función public.fs_desglose_pago y vista public.ocm_daily.
+-- NO cambia (después de revisar esta regla común): public.fs_ventas_diarias,
+-- dashboard-app/src/lib/pos-daily.ts y las pantallas POS. Mientras tanto esas rutas siguen
+-- con la regla anterior y pueden contradecir a esta vista.
 --
 -- REVERSA EXACTA
 -- --------------
--- Ejecutar el bloque "DEFINICIÓN ANTERIOR" del final (restaura la vista) y, opcionalmente,
--- DROP FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text);
--- Nada se migra ni se reescribe en tablas: sólo cambia cómo se calcula la vista.
---
--- COMPROBACIÓN
--- ------------
--- supabase/tests/ocm_daily_desglose_pagos_test.sql (dos tenants, cambio y propina; corre en
--- una transacción y termina en ROLLBACK).
+-- Ejecutar el bloque "DEFINICIÓN ANTERIOR" del final (restaura la vista; al quitar las 4
+-- columnas hace falta DROP VIEW + CREATE VIEW, ya incluido) y DROP FUNCTION
+-- public.fs_desglose_pago(numeric, numeric, jsonb, text). No se migran ni reescriben tablas.
+-- Permisos: CREATE OR REPLACE conserva ACL; el DROP/CREATE de la reversa los pierde, por eso
+-- el bloque los restaura (GRANT idénticos a producción al 2026-10-01).
 
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.fs_desglose_pago(
   p_total numeric, p_propina numeric, p_pagos jsonb, p_metodo_pago text
 )
-RETURNS TABLE(efectivo numeric, tarjeta numeric)
+RETURNS TABLE(efectivo numeric, tarjeta numeric, otros_medios numeric,
+              no_determinado numeric, excedente_pagos numeric)
 LANGUAGE sql
 IMMUTABLE
 PARALLEL SAFE
@@ -105,46 +110,82 @@ AS $fn$
   WITH base AS (
     SELECT COALESCE(p_total, 0) AS total,
            COALESCE(p_propina, 0) AS propina,
-           CASE WHEN jsonb_typeof(p_pagos) = 'array' THEN p_pagos ELSE '[]'::jsonb END AS pagos
+           CASE WHEN jsonb_typeof(p_pagos) = 'array' THEN p_pagos ELSE '[]'::jsonb END AS pagos,
+           COALESCE(btrim(p_metodo_pago), '') AS metodo
   ), a AS (
-    SELECT b.total, b.propina,
-           count(q.v) AS n,
+    SELECT b.total, b.propina, b.metodo,
+           count(q.e) AS n_el,
+           count(q.v) FILTER (WHERE q.v >= 0) AS n_ok,
            COALESCE(sum(q.v), 0) AS suma,
            COALESCE(sum(q.v) FILTER (WHERE q.me ~* 'efec' AND q.me !~* 'tarj'), 0) AS cash,
            COALESCE(sum(q.v) FILTER (WHERE q.me ~* 'tarj' AND q.me !~* 'efec'), 0) AS card,
-           COALESCE(sum(q.v) FILTER (WHERE NOT (q.me ~* 'efec' OR q.me ~* 'tarj')), 0) AS otros
+           COALESCE(sum(q.v) FILTER (WHERE NOT (q.me ~* 'efec' AND q.me !~* 'tarj')
+                                       AND NOT (q.me ~* 'tarj' AND q.me !~* 'efec')), 0) AS otros
       FROM base b
       LEFT JOIN LATERAL (
-        SELECT COALESCE(e->>'metodo', '') AS me,
-               CASE WHEN e->>'monto' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (e->>'monto')::numeric END AS v
+        SELECT e,
+               COALESCE(e->>'metodo', '') AS me,
+               CASE WHEN jsonb_typeof(e->'monto') IN ('number','string')
+                     AND (e->>'monto') ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (e->>'monto')::numeric END AS v
           FROM jsonb_array_elements(b.pagos) e
       ) q ON true
-     GROUP BY b.total, b.propina
+     GROUP BY b.total, b.propina, b.metodo
   ), c AS (
     SELECT a.*,
+           (a.n_el > 0 AND a.n_el = a.n_ok AND a.suma > 0) AS valido,
            greatest(a.suma - a.total, 0) AS exceso,
-           least(a.propina, greatest(a.suma - a.total, 0)) AS prop_inc
+           greatest(a.total - a.suma, 0) AS falta,
+           ((a.cash > 0)::int + (a.card > 0)::int + (a.otros > 0)::int) AS clases
       FROM a
   ), d AS (
     SELECT c.*,
-           (c.exceso - c.prop_inc) AS cambio,
-           (c.n > 0 AND c.suma >= c.total - 0.005 AND c.otros = 0
-            AND c.prop_inc <= c.card + 0.005
-            AND (c.exceso - c.prop_inc) <= c.cash + 0.005) AS aplica
+           CASE
+             WHEN c.n_el = 0 THEN 'declarado'
+             WHEN NOT c.valido THEN 'nd'
+             WHEN c.exceso <= 0.005 AND c.falta <= 0.005 THEN 'monto'
+             WHEN c.exceso > 0.005 AND c.clases = 1 THEN 'unica'
+             WHEN c.exceso > 0.005 AND c.propina <= 0.005 AND c.cash >= c.exceso - 0.005 THEN 'cambio'
+             WHEN c.falta > 0.005 AND c.propina <= 0.005 THEN 'falta'
+             ELSE 'nd'
+           END AS modo
       FROM c
   )
   SELECT
-    CASE WHEN d.aplica THEN d.cash - d.cambio
-         WHEN p_metodo_pago ~* 'efec' AND p_metodo_pago !~* 'tarj' THEN d.total
-         ELSE 0::numeric END,
-    CASE WHEN d.aplica THEN d.card - d.prop_inc
-         WHEN p_metodo_pago ~* 'tarj' AND p_metodo_pago !~* 'efec' THEN d.total
-         ELSE 0::numeric END
+    CASE d.modo
+      WHEN 'declarado' THEN CASE WHEN d.metodo ~* 'efec' AND d.metodo !~* 'tarj' THEN d.total ELSE 0::numeric END
+      WHEN 'unica'     THEN CASE WHEN d.cash > 0 THEN d.total ELSE 0::numeric END
+      WHEN 'cambio'    THEN d.cash - d.exceso
+      WHEN 'monto'     THEN d.cash
+      WHEN 'falta'     THEN d.cash
+      ELSE 0::numeric END,
+    CASE d.modo
+      WHEN 'declarado' THEN CASE WHEN d.metodo ~* 'tarj' AND d.metodo !~* 'efec' THEN d.total ELSE 0::numeric END
+      WHEN 'unica'     THEN CASE WHEN d.card > 0 THEN d.total ELSE 0::numeric END
+      WHEN 'cambio'    THEN d.card
+      WHEN 'monto'     THEN d.card
+      WHEN 'falta'     THEN d.card
+      ELSE 0::numeric END,
+    CASE d.modo
+      WHEN 'declarado' THEN CASE WHEN d.metodo <> '' AND NOT (d.metodo ~* 'efec' OR d.metodo ~* 'tarj') THEN d.total ELSE 0::numeric END
+      WHEN 'unica'     THEN CASE WHEN d.otros > 0 THEN d.total ELSE 0::numeric END
+      WHEN 'cambio'    THEN d.otros
+      WHEN 'monto'     THEN d.otros
+      WHEN 'falta'     THEN d.otros
+      ELSE 0::numeric END,
+    d.total - (
+      CASE d.modo
+        WHEN 'declarado' THEN CASE WHEN d.metodo <> '' AND NOT (d.metodo ~* 'efec' AND d.metodo ~* 'tarj') THEN d.total ELSE 0::numeric END
+        WHEN 'unica'     THEN d.total
+        WHEN 'cambio'    THEN d.suma - d.exceso
+        WHEN 'monto'     THEN d.suma
+        WHEN 'falta'     THEN d.suma
+        ELSE 0::numeric END),
+    CASE WHEN d.valido THEN d.exceso ELSE 0::numeric END
   FROM d
 $fn$;
 
 COMMENT ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text) IS
-  'Reparte la venta de un ticket entre efectivo y tarjeta usando sus pagos reales (propina incluida en tarjeta, cambio en efectivo). Si el ticket no queda explicado por esas dos formas, conserva la regla anterior (primera forma de pago x total).';
+  'Reparte la venta de un ticket entre efectivo, tarjeta y otros medios sólo cuando es demostrable con sus pagos; el resto queda en no_determinado (efectivo+tarjeta+otros+no_determinado = total). excedente_pagos = propina incluida + cambio sin repartir. No asume semántica bruta/neta del monto.';
 
 CREATE OR REPLACE VIEW public.ocm_daily AS
  WITH live AS NOT MATERIALIZED (
@@ -161,7 +202,11 @@ CREATE OR REPLACE VIEW public.ocm_daily AS
             sum(COALESCE(o.personas, 0))::integer AS personas_restaurant,
             round(sum(o.total) / NULLIF(count(*), 0)::numeric, 2) AS ticket_promedio_restaurant,
             sum(COALESCE(o.propina, 0::numeric)) AS propinas_total,
-            max(o.updated_at) AS generated_at
+            max(o.updated_at) AS generated_at,
+            sum(dp.otros_medios) AS otros_medios,
+            sum(dp.no_determinado) AS no_determinado,
+            sum(dp.excedente_pagos) AS excedente_pagos,
+            (count(*) FILTER (WHERE dp.no_determinado <> 0))::integer AS tickets_no_determinado
            FROM pos_orders o
              CROSS JOIN LATERAL public.fs_desglose_pago(o.total, o.propina, o.pagos, o.metodo_pago) dp
           WHERE o.status = ANY (ARRAY['cerrada'::text, 'completada'::text])
@@ -198,7 +243,11 @@ CREATE OR REPLACE VIEW public.ocm_daily AS
     live.personas_restaurant,
     live.ticket_promedio_restaurant,
     live.propinas_total,
-    live.generated_at
+    live.generated_at,
+    live.otros_medios,
+    live.no_determinado,
+    live.excedente_pagos,
+    live.tickets_no_determinado
    FROM live
 UNION ALL
  SELECT h.client_id,
@@ -214,11 +263,22 @@ UNION ALL
     h.personas_restaurant,
     h.ticket_promedio_restaurant,
     h.propinas_total,
-    h.generated_at
+    h.generated_at,
+    NULL::numeric,
+    NULL::numeric,
+    NULL::numeric,
+    NULL::integer
    FROM hist h
   WHERE NOT (EXISTS ( SELECT 1
            FROM live l
           WHERE l.client_id = h.client_id AND l.fecha = h.fecha));
+
+-- La vista es security_invoker: quien la consulta ejecuta la función con SUS privilegios. Se
+-- limita a los roles que ya pueden leer ocm_daily (anon no puede leerla, así que no necesita
+-- la función). Es pura (IMMUTABLE, sin acceso a tablas): no abre datos a nadie.
+REVOKE ALL ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text)
+  TO authenticated, service_role, fullsite_readonly, fullsite_agent;
 
 -- CREATE OR REPLACE conserva opciones y permisos; se reafirma lo que ya tiene producción.
 ALTER VIEW public.ocm_daily SET (security_invoker = on);
@@ -227,10 +287,13 @@ COMMIT;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- DEFINICIÓN ANTERIOR (reversa). Leída de producción con pg_get_viewdef el 2026-10-01.
--- Sólo difieren las dos columnas `efectivo` y `tarjeta` de la CTE `live` y su FROM.
+-- Difieren: `efectivo`/`tarjeta` de la CTE `live` y su FROM, y las 4 columnas nuevas. Quitar
+-- columnas exige DROP VIEW (la vista no tiene dependientes ni funciones que la nombren,
+-- medido el 2026-10-01); por eso se restauran los GRANT exactos de producción.
 -- ─────────────────────────────────────────────────────────────────────────────
 -- BEGIN;
--- CREATE OR REPLACE VIEW public.ocm_daily AS
+-- DROP VIEW public.ocm_daily;
+-- CREATE VIEW public.ocm_daily AS
 --  WITH live AS NOT MATERIALIZED (
 --          SELECT o.client_id,
 --             (o.created_at AT TIME ZONE 'America/Monterrey'::text)::date AS fecha,
@@ -311,4 +374,8 @@ COMMIT;
 --            FROM live l
 --           WHERE l.client_id = h.client_id AND l.fecha = h.fecha));
 -- ALTER VIEW public.ocm_daily SET (security_invoker = on);
+-- GRANT ALL ON public.ocm_daily TO authenticated, service_role;
+-- GRANT INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON public.ocm_daily TO anon;
+-- GRANT SELECT ON public.ocm_daily TO fullsite_readonly, fullsite_agent;
+-- DROP FUNCTION public.fs_desglose_pago(numeric, numeric, jsonb, text);
 -- COMMIT;
