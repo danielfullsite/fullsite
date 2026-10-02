@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { leerConfigDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
-import { crearRpc, intencion, leerFrescura, textoFrescura, contextoProducto, contextoReceta, contextoInsumo } from '@/lib/chat-nativo'
+import { crearRpc, intencion, leerFrescura, textoFrescura, contextoProducto, contextoReceta, contextoInsumo, esReferenciaCatalogoNatural } from '@/lib/chat-nativo'
 import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -823,6 +823,7 @@ export async function POST(request: NextRequest) {
 
     // ── CONOCIMIENTO NATIVO (tablas propias de Fullsite, funciones fs_*) ─────────
     const intent = intencion(q)
+    const referenciaCatalogo = esReferenciaCatalogoNatural(message)
     const natDesde = dateFilter?.start || restarDias(todayStr, 89)
     const natHasta = dateFilter?.end || todayStr
     // La frescura va primero: con la fecha de la última venta del POS, "0 ventas de
@@ -832,9 +833,9 @@ export async function POST(request: NextRequest) {
     // Filas del top de productos (sin búsqueda) para la gráfica "top_platillos".
     const productosGrafica: { topFilas?: Record<string, unknown>[] } = {}
     const [productoNativo, recetaCtx, insumoCtx] = await Promise.all([
-      intent.producto ? contextoProducto(rpc, client_id || '', message, natDesde, natHasta, zona, ultimaVentaPos, productosGrafica) : Promise.resolve(''),
+      (intent.producto || referenciaCatalogo) ? contextoProducto(rpc, client_id || '', message, natDesde, natHasta, zona, ultimaVentaPos, productosGrafica) : Promise.resolve(''),
       intent.receta ? contextoReceta(rpc, client_id || '', message) : Promise.resolve(''),
-      (intent.insumo || intent.receta) ? contextoInsumo(rpc, client_id || '', message) : Promise.resolve(''),
+      (intent.insumo || intent.receta || referenciaCatalogo) ? contextoInsumo(rpc, client_id || '', message) : Promise.resolve(''),
     ])
     const fuenteCtx = fuenteVentas === 'fullsite+wansoft'
       ? `\nFUENTE DE VENTAS: POS de Fullsite para los días posteriores a ${ultimoWansoft}; antes de esa fecha, histórico importado.\n`

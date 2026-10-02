@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { terminosBusqueda, intencion, contextoProducto, contextoReceta, contextoInsumo, contextoFrescura, textoFrescura, leerFrescura } from '@/lib/chat-nativo'
+import { terminosBusqueda, intencion, contextoProducto, contextoReceta, contextoInsumo, contextoFrescura, textoFrescura, leerFrescura, esReferenciaCatalogoNatural, variantesBusqueda } from '@/lib/chat-nativo'
 
 // RPC falso: registra llamadas y devuelve lo que cada prueba necesita.
 function rpcFalso(resp: Record<string, (args: Record<string, unknown>) => Record<string, unknown>[] | null>) {
@@ -17,7 +17,14 @@ describe('terminosBusqueda / intencion', () => {
     expect(intencion('quien es el proveedor de la miel de maple kirkland').insumo).toBe(true)
     expect(intencion('cuantos gramos de ribeye lleva la orden de taquitos').receta).toBe(true)
     expect(intencion('cuantas smarty chips se han vendido').producto).toBe(true)
+    expect(intencion('¿las chips de qué marca son?').insumo).toBe(true)
     expect(intencion('quien es el mejor mesero')).toEqual({ producto: false, receta: false, insumo: false })
+  })
+  it('entiende referencias cortas de catálogo sin exigir el nombre exacto', () => {
+    expect(esReferenciaCatalogoNatural('las chips')).toBe(true)
+    expect(esReferenciaCatalogoNatural('¿las chips de qué marca son?')).toBe(true)
+    expect(esReferenciaCatalogoNatural('¿cómo vamos hoy?')).toBe(false)
+    expect(variantesBusqueda(['chips', 'papitas'])).toEqual(['chips', 'chip', 'papitas', 'papita'])
   })
 })
 
@@ -80,6 +87,16 @@ describe('contextoInsumo', () => {
     const { rpc } = rpcFalso({ fs_insumo: () => [{ insumo: 'Paprika', unidad: 'GRS', costo_unitario: 0.115, proveedor: 'BRENDAS', proveedor_telefono: '8112345678', proveedor_contacto: null, dias_entrega: null, usado_en: ['Spicy Deluxe'] }] })
     const t = await contextoInsumo(rpc, 'x', 'quien es el proveedor de paprika')
     expect(t).toContain('Paprika: $0.115 por GRS, proveedor BRENDAS (8112345678) | se usa en: Spicy Deluxe')
+  })
+  it('reintenta singular si el operador pregunta en plural y declara ambigüedad real', async () => {
+    const { rpc, llamadas } = rpcFalso({ fs_insumo: a => a.p_busqueda === 'chip' ? [
+      { insumo: 'CHIP JALAPEÑO', unidad: 'BOLSA', costo_unitario: 15, proveedor: 'A', usado_en: [] },
+      { insumo: 'CHIP SAL DE MAR', unidad: 'BOLSA', costo_unitario: 16, proveedor: 'B', usado_en: [] },
+    ] : [] })
+    const t = await contextoInsumo(rpc, 'x', 'las chips')
+    expect(llamadas.map(l => l.args.p_busqueda)).toEqual(['chips', 'chip'])
+    expect(t).toContain('Coincidieron 2 insumos')
+    expect(t).toContain('pide cuál antes de atribuir')
   })
 })
 
