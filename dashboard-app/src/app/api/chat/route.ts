@@ -29,6 +29,7 @@ import {
 } from '@/lib/ia-lectura'
 import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificador-numeros'
 import { marcoRazonamientoOperativo } from '@/lib/chat-operating-intent'
+import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'
 
 // Ciclo de consultas (hasta ~20 s) + lecturas: más que el default de algunas cuentas.
 export const maxDuration = 60
@@ -1170,6 +1171,7 @@ PERSONALIDAD:
 - Si no tienes un dato, di "No tengo ese dato disponible. Te sugiero revisarlo en [lugar correcto]." NUNCA digas "no tenemos eso" de forma cortante.
 - Si el usuario pregunta por un producto que no está en los datos, di "No encontré [producto] en los registros. ¿Quieres que busque con otro nombre?"
 ${marcoRazonamientoOperativo(message)}
+${marcoEvidenciaOperativa()}
 
 REGLA #0 — SOLO RESTAURANTE:
 Eres el copiloto de ${datoTexto(restaurantName, 80)}. SOLO contestas preguntas sobre el restaurante: ventas, meseros, platillos, inventario, costos, reservaciones, operaciones.
