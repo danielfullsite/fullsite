@@ -3,7 +3,7 @@
 // herramientas con topes, y gráficas que sólo arma el servidor con filas reales.
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  bloqueMapa, contenidoResultado, credencialesLectura, datosHastaDeTablas, leerMapa, lineaTabla, normalizarMapa,
+  bloqueMapa, coberturaSemantica, contenidoResultado, credencialesLectura, datosHastaDeTablas, leerMapa, lineaTabla, normalizarMapa,
   pistasDelMapa, relevancia, responderConHerramientas, terminosDePregunta, tipoCorto,
   MAX_CHARS_RESULTADO, type ConsultaHecha, type EntradaCiclo, type ResultadoConsulta, type TablaMapa,
 } from '@/lib/ia-lectura'
@@ -100,6 +100,20 @@ describe('mapa de datos', () => {
     expect(p).toContain('jsonb_array_elements(items)')
     expect(p).toContain('dia_venta')
     expect(p).toContain('histórico importado')
+  })
+
+  it('separa fuentes necesarias para una pregunta compuesta, sin inventar cobertura', () => {
+    const tablas = [
+      T('pos_orders', [['created_at', 'timestamp with time zone'], ['total', 'numeric']]),
+      T('pos_inventory', [['stock_actual', 'numeric'], ['producto', 'text']]),
+      T('pos_customers', [['customer_id', 'uuid'], ['telefono', 'text']]),
+    ]
+    const c = coberturaSemantica(tablas, '¿La publicidad mejoró dinner y volvieron clientes nuevos sin quedarnos sin stock?')
+    expect(c).toContain('franja horaria: consulta primero pos_orders')
+    expect(c).toContain('clientes y recurrencia: consulta primero pos_customers')
+    expect(c).toContain('inventario físico: consulta primero pos_inventory')
+    expect(c).toContain('campaña y atribución: no hay fuente directa identificada')
+    expect(c).toContain('no es evidencia por sí sola')
   })
 
   it('datosHastaDeTablas: última fecha de las tablas que menciona el SQL', () => {
