@@ -28,6 +28,7 @@ import {
   mensajesDeRespaldo, MAX_CONSULTAS, type ConsultaHecha, type ResultadoCiclo,
 } from '@/lib/ia-lectura'
 import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificador-numeros'
+import { quitarBloquesNoVerificados } from '@/lib/chat-safe-output'
 import { marcoRazonamientoOperativo } from '@/lib/chat-operating-intent'
 import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'
 import { marcoAprendizajeMaestro, type LeccionMaestraRegistrada } from '@/lib/chat-master-learning'
@@ -911,8 +912,10 @@ export async function POST(request: NextRequest) {
         const ventasDia = Number(d.ventas_dia) || 0
 
         const personas = Number(d.personas_restaurant) || 0
+        const tieneTickets = d.tickets_count !== null && d.tickets_count !== undefined
+        const tickets = Number(d.tickets_count) || 0
         const ticketPromedio = personas > 0 ? Math.round(ventasDia / personas) : 0
-        let line = `${d.fecha} (${dow}): Ventas $${ventasDia}, ${personas} personas, TicketPromedio $${ticketPromedio}`
+        let line = `${d.fecha} (${dow}): Ventas $${ventasDia}, ${personas} personas${tieneTickets ? `, ${tickets} tickets` : ', tickets no disponibles'}, TicketPromedio $${ticketPromedio}`
 
         if (wantsDetail) {
           const descuentos = Number(d.descuentos) || 0
@@ -1263,8 +1266,12 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 FECHA DE HOY: ${fechaLargaEnZona(zona)}, ${horaEnZona(zona)} (zona ${zona}). DÍA DE VENTA EN CURSO: ${todayStr} (el día de venta empieza a las ${dia.inicio.slice(0, 5)}; antes de esa hora sigue siendo el día anterior). "Hoy" = ${todayStr}. Úsalo para ubicar "ayer", "la semana pasada", "mañana", etc.
 
 FORMATO DE DATOS (lee esto para saber dónde buscar):
-- Cada día tiene: "fecha (día): Ventas $X, N personas, TicketPromedio $Y | Meseros: <Mesero A>:$X, <Mesero B>:$Y | Grupos: <CATEGORÍA>:$X | Platillos: <PLATILLO>:Npzas/$X"
-- MESEROS están después de "| Meseros:" con nombre:$total. El de mayor $ es el mejor.
+- Cada día tiene: "fecha (día): Ventas $X, N personas, N tickets (si disponible), TicketPromedio $Y | Meseros: <Mesero A>:$X, <Mesero B>:$Y | Grupos: <CATEGORÍA>:$X | Platillos: <PLATILLO>:Npzas/$X"
+- Personas, tickets, órdenes, pagos y mesas son métricas distintas aunque coincidan sus cifras. Sólo llama "tickets" al campo tickets y "órdenes" a una métrica que lo diga expresamente; nunca infieras órdenes a partir de personas.
+- Nunca muestres el texto interno "[sin verificar]" ni uses un bloque omitido para hacer un ranking, explicar un cambio o sacar una conclusión.
+- Una receta, un platillo vendido o su costo NO prueban stock. Sólo afirma disponibilidad, riesgo de desabasto o que una acción no afectará inventario con un snapshot vigente de INVENTARIO; si falta, decláralo como dato pendiente.
+- No recomiendes replicar turnos, cambiar personal o atribuir un resultado a un mesero sin cobertura del turno/franja y una métrica comparable de esa misma franja.
+- MESEROS están después de "| Meseros:" con nombre:$total. El mayor $ sólo indica mayor venta observada en ese periodo; no demuestra desempeño, causa ni cobertura de turno.
 - PLATILLOS están después de "| Platillos:" con nombre:cantidadpzas/$total.
 - GRUPOS = categorías del menú de ESTE restaurante.
 - RANKINGS por categoría y DESGLOSE POR DÍA están en bloque aparte por mesero (si existen).
@@ -1453,13 +1460,15 @@ ${envolverDatos(bloqueDatos)}`
         return { texto: await groq.groqChat({ messages: msgsRep, maxTokens: 4000 }) }
       },
     })
-    text = garantia.texto
+    const salidaSegura = quitarBloquesNoVerificados(garantia.texto)
+    text = salidaSegura.texto
     // Conteos, nunca valores.
     console.log(`[chat] verificador ${JSON.stringify({
       afirmaciones: garantia.afirmaciones,
       sin_rastro: garantia.sinRastroInicial,
       reparado: garantia.reparado,
       marcados: garantia.marcados,
+      bloques_omitidos: salidaSegura.omitidos,
       ms_reparacion: garantia.msReparacion,
       voz: enVoz,
     })}`)
