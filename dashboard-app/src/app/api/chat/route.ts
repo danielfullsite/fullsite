@@ -1134,9 +1134,10 @@ REGLA #2 — CONSULTA LIBRE (herramienta consultar_datos):
 Además de los bloques precalculados tienes el MAPA DE DATOS (dentro del bloque de datos, al final): las tablas de este restaurante con sus columnas y fechas.
 1. RUTA RÁPIDA: si un bloque precalculado ya contesta la pregunta, contesta con él SIN consultar.
 2. Usa consultar_datos para lo demás: cruzar secciones (p. ej. ventas contra asistencia o gastos), tablas que no vienen precalculadas, periodos a la medida, análisis por HORA DEL DÍA o FRANJA (comida, cena) con las columnas de hora de apertura/cierre del mapa, conteos o rankings específicos. Si el dato requiere ese nivel de detalle, CONSÚLTALO — no digas "no tengo acceso a ese detalle": si la columna está en el mapa, sí lo tienes. Máximo ${MAX_CONSULTAS} consultas por respuesta: pide lo justo y agrega en SQL (GROUP BY, LIMIT).
-3. SQL de Postgres de sólo lectura (una sentencia SELECT/WITH) con los nombres EXACTOS de tablas y columnas del mapa, sin esquema y sin filtrar por client_id (ya viene filtrado). Funciones permitidas: agregados, fecha/hora (date_trunc, extract, to_char, now), texto, jsonb (jsonb_array_elements, ->, ->>), ventanas y es_venta(status, payment_status).
-4. Sumas, promedios, conteos y porcentajes se hacen EN SQL; nunca los calcules tú.
-5. Si la consulta regresa error, corrígela con el mensaje; si no puedes, di que no pudiste consultarlo.
+3. PREGUNTAS COMPUESTAS: divide la investigación internamente y responde en este turno todas las partes que tengan cobertura. No pidas permiso para hacer una comparación más amplia, no abras con "No puedo responder" y no dejes de consultar por faltar una subpregunta. Empieza por lo que comprobaste y después explica sólo la laguna concreta.
+4. SQL de Postgres de sólo lectura (una sentencia SELECT/WITH) con los nombres EXACTOS de tablas y columnas del mapa, sin esquema y sin filtrar por client_id (ya viene filtrado). Funciones permitidas: agregados, fecha/hora (date_trunc, extract, to_char, now), texto, jsonb (jsonb_array_elements, ->, ->>), ventanas y es_venta(status, payment_status).
+5. Sumas, promedios, conteos y porcentajes se hacen EN SQL; nunca los calcules tú.
+6. Si la consulta regresa error, corrígela con el mensaje; si no puedes, di que no pudiste consultarlo, pero entrega el resto de la respuesta que sí esté respaldado.
 6. Nombra las columnas por su unidad: dinero con total/venta/importe/ticket/precio (p. ej. "as venta_total"), porcentajes con pct (p. ej. "as pct_bebidas", ya multiplicado por 100). Así se verifican tus cifras.
 ${pistasDelMapa(mapa.ok ? mapa.tablas : [])}
 
@@ -1260,7 +1261,7 @@ CÓMO INTERPRETAR (lee la intención, no las palabras):
 - "propinas" → "Propinas $X" en datos diarios. Si un día no trae ese campo, di que para ese día no hay propinas registradas. NO inventes montos.
 - "inventario" / "stock" / "market" → INVENTARIO MARKET si hay datos. Si preguntan por ingredientes de cocina, di que se revisa en /pos/inventario.
 - "vs semana pasada" / "comparado con" → ÚLTIMOS 7 DÍAS COMPLETOS vs LOS 7 ANTERIORES (ya calculado, con fechas y días con datos; hoy va aparte porque está en curso). Si dice SIN COBERTURA, NO COMPARABLE o cobertura desigual, dilo.
-- Si algo NO está en el contexto (ninguna sección lo trae calculado): ${hayConsultaLibre ? 'consúltalo con consultar_datos; si no se puede, di "no lo tengo"' : 'di "no lo tengo calculado"'} en vez de calcularlo.
+- Si algo NO está en el contexto (ninguna sección lo trae calculado): ${hayConsultaLibre ? 'consúltalo con consultar_datos; si no se puede, di exactamente qué falta y contesta el resto que sí tengas' : 'di exactamente qué no está calculado y contesta el resto que sí tengas'} en vez de calcularlo.
 - Cualquier nombre propio → buscar en TODOS los datos disponibles
 
 FECHA DE HOY: ${fechaLargaEnZona(zona)}, ${horaEnZona(zona)} (zona ${zona}). DÍA DE VENTA EN CURSO: ${todayStr} (el día de venta empieza a las ${dia.inicio.slice(0, 5)}; antes de esa hora sigue siendo el día anterior). "Hoy" = ${todayStr}. Úsalo para ubicar "ayer", "la semana pasada", "mañana", etc.
