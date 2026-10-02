@@ -771,7 +771,11 @@ export function ventasPorHoraDesdeAcumulados(filas: { fecha?: unknown; data?: un
 
 export function preguntaDeAlertas(q: string): boolean {
   const n = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  return /(alerta|problema|que esta mal|que anda mal|algo mal|anomal|pendiente|que debo atender|que atiendo|riesgo|deteccion)/.test(n)
+  // Una pregunta de dirección también pide alertas aunque no diga "alerta".
+  // "¿Cuál es el dolor más grande?" era rechazada por el chat a pesar de ser la
+  // pregunta más natural de un dueño. No se responde con un texto genérico: abre
+  // la misma evidencia operativa que "¿qué debo atender?".
+  return /(alerta|problema|que esta mal|que anda mal|algo mal|anomal|pendiente|que debo atender|que atiendo|riesgo|deteccion|dolor|prioridad|prioritario|mayor reto|reto principal|principal reto|mas urgente|más urgente)/.test(n)
 }
 
 /** Alertas abiertas (ya filtradas por `desdeEventos`) → texto para el prompt. */
@@ -779,14 +783,19 @@ export function contextoAlertas(items: Atencion[], horas = 48): string {
   if (items.length === 0) {
     return `\nALERTAS DE LOS AGENTES (últimas ${horas} h): no hay alertas abiertas en ese periodo. [Ver agentes →](/agentes)\n`
   }
-  const lineas = items.slice(0, 12).map(a => {
+  // Un agente puede repetir el mismo hallazgo cada vez que corre. Para una decisión
+  // gerencial importa la evidencia más reciente de cada problema, no cuántas veces
+  // se escribió. Así evitamos frases absurdas como "376 alertas" como si fueran 376
+  // problemas distintos.
+  const unicas = [...new Map(items.map(a => [`${a.tipo || ''}|${a.titulo}`, a])).values()]
+  const lineas = unicas.slice(0, 5).map(a => {
     const valor = a.valor ? ` (en juego ${pesos(a.valor)})` : ''
     const por = a.explicacion ? ` — ${datoTexto(a.explicacion, 200)}` : ''
     const acc = a.accionSugerida ? ` | Acción sugerida: ${datoTexto(a.accionSugerida, 160)}` : ''
     return `  - [${a.severidad}] ${datoTexto(a.titulo, 120)}${valor}${por}${acc}`
   })
-  const extra = items.length > 12 ? `\n  (+${items.length - 12} alertas más en /agentes)` : ''
-  return `\nALERTAS DE LOS AGENTES (abiertas, últimas ${horas} h, ordenadas por gravedad; ya filtradas):\n${lineas.join('\n')}${extra}\nPara "¿qué alertas tengo?" o "¿qué está mal?" contesta con ESTAS. [Ver agentes →](/agentes)\n`
+  const extra = unicas.length > 5 ? `\n  (hay otros ${unicas.length - 5} tipos de hallazgo en /agentes)` : ''
+  return `\nPRIORIDADES OPERATIVAS (hallazgos abiertos, deduplicados por problema, últimas ${horas} h y ordenados por gravedad):\n${lineas.join('\n')}${extra}\nPara "¿qué alertas tengo?", "¿qué está mal?" o "¿cuál es el dolor más grande?" responde con las 1–3 prioridades de ESTA lista: explica el hecho, por qué importa y la primera acción. No uses el número bruto de ejecuciones/alertas como si fueran problemas distintos. [Ver agentes →](/agentes)\n`
 }
 
 // ─── Recetas: emparejar el nombre del POS con el del costeo ────────────────
