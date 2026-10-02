@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { leerConfigDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
 import { crearRpc, intencion, leerFrescura, textoFrescura, contextoProducto, contextoReceta, contextoInsumo } from '@/lib/chat-nativo'
-import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
+import { buildDailyFromOrders, ventasFullsitePrimero } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { esDuenoDelHistoricoWansoft } from '@/lib/wansoft-legacy'
@@ -380,33 +380,22 @@ export async function POST(request: NextRequest) {
     // que poder decir la diferencia. Ver pos-daily.ts / LecturaDiariaFallida.
     let ventasDeterminadas = true
     let motivoVentas = ''
-    // FUENTE PRINCIPAL = POS DE FULLSITE. Wansoft (wansoft_daily) queda sólo como
-    // histórico viejo: si su último día tiene más de 2 días, o el tenant ya opera en
-    // Fullsite, los días recientes salen de pos_orders y se pegan encima del histórico.
-    let fuenteVentas = recentDays.length > 0 ? 'wansoft' : 'fullsite'
-    const ultimoWansoft = recentDays.length > 0 ? String(recentDays[0].fecha || '') : ''
-    const haceDosDias = sumarDias(todayStr, -2, zona)
-    if (recentDays.length === 0) {
-      const estado = await buildDailyConEstado(sbUrl, sbHeaders, client_id || '', histLimit)
-      recentDays = estado.dias
-      ventasDeterminadas = estado.determinado
-      if (!estado.determinado) motivoVentas = estado.motivo
-      // Los dos lados fallaron → no se sabe nada. Si sólo falló el histórico, se dice aparte.
-      if (recentDaysRaw === null && estado.determinado && estado.dias.length === 0) {
-        ventasDeterminadas = false
-        motivoVentas = 'no se pudo leer el histórico de ventas y el POS no tiene ventas en el periodo'
-      }
-    } else if (clientConfig.data_source === 'fullsite' || ultimoWansoft < haceDosDias) {
-      const estado = await buildDailyConEstado(sbUrl, sbHeaders, client_id || '', histLimit)
-      if (!estado.determinado) fuentesFallidas.push('ventas del POS')
-      if (estado.determinado && estado.dias.length > 0) {
-        const nuevos = estado.dias.filter(d => String((d as Record<string, unknown>).fecha || '') > ultimoWansoft)
-        if (nuevos.length > 0) {
-          recentDays = [...nuevos, ...recentDays].slice(0, histLimit)
-          fuenteVentas = 'fullsite+wansoft'
-        }
-      }
+    // FUENTE PRINCIPAL = SQL operativo de Fullsite. El lector reemplaza cualquier
+    // fecha solapada del espejo Wansoft y sólo conserva éste para historia que el POS
+    // ya no cubre. Así la IA no presenta una importación vieja como "hoy".
+    const ventasVivas = await ventasFullsitePrimero(sbUrl, sbHeaders, client_id || '', histLimit, selectCols)
+    recentDays = ventasVivas.dias
+    ventasDeterminadas = ventasVivas.determinado
+    // `fullsite+wansoft` es el nombre de compatibilidad del catálogo de gráficas;
+    // Wansoft sólo aporta historia no solapada, no la operación actual.
+    const fuenteVentas = ventasVivas.fuente === 'historico' ? 'wansoft'
+      : ventasVivas.fuente === 'fullsite+historico' ? 'fullsite+wansoft'
+        : ventasVivas.fuente
+    if (!ventasVivas.determinado) {
+      motivoVentas = ventasVivas.motivo || 'no se pudieron leer las ventas operativas'
+      fuentesFallidas.push('ventas del POS')
     }
+    if (recentDaysRaw === null) fuentesFallidas.push('histórico de ventas')
 
     // 3. Waiter × platillo data — process results from parallel fetch
     let waiterContext = ''
@@ -822,8 +811,12 @@ export async function POST(request: NextRequest) {
       (intent.insumo || intent.receta) ? contextoInsumo(rpc, client_id || '', message) : Promise.resolve(''),
     ])
     const fuenteCtx = fuenteVentas === 'fullsite+wansoft'
-      ? `\nFUENTE DE VENTAS: POS de Fullsite para los días posteriores a ${ultimoWansoft}; antes de esa fecha, histórico importado.\n`
-      : fuenteVentas === 'wansoft' ? `\nFUENTE DE VENTAS: histórico importado (último día ${ultimoWansoft}); el POS de Fullsite no tiene ventas más recientes.\n` : ''
+      ? '\nFUENTE DE VENTAS: SQL operativo de Fullsite para toda fecha que cubre; el histórico importado sólo completa fechas que SQL no devolvió. Nunca llames "actual" al histórico.\n'
+      : fuenteVentas === 'fullsite'
+        ? '\nFUENTE DE VENTAS: SQL operativo de Fullsite.\n'
+        : fuenteVentas === 'wansoft'
+          ? `\nFUENTE DE VENTAS: sólo histórico importado (último día ${ventasVivas.ultimoHistorico || 'no disponible'}). No afirmes que representa la operación actual.\n`
+          : '\nFUENTE DE VENTAS: no hay una fuente de ventas disponible.\n'
 
     // 2e. Product search — FULL platillos list (incl. Market) from wansoft_data.platillos_full
     // platillos_top solo trae top 30/día; productos chicos del Market (ej. Smarty chips) nunca aparecen ahí.

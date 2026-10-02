@@ -152,12 +152,17 @@ export async function ventasFullsitePrimero(
   const [hist, pos] = await Promise.all([leerHistorico(), buildDailyConEstado(sbUrl, sbHeaders, clientId, days)])
   const historico = hist.filas
   const ultimoHistorico = historico.length ? String(historico[0].fecha || '') : ''
-  const nuevos = pos.dias.filter(d => String(d.fecha || '') > ultimoHistorico)
-  const dias = [...nuevos, ...historico]
+  // El agregado SQL de Fullsite es canónico también cuando coincide con una fecha
+  // importada. Antes sólo agregábamos días POSTERIORES al último Wansoft: AMALAY
+  // seguía contestando el presente con un espejo aunque el POS ya tuviera el día.
+  // Conservamos Wansoft únicamente para fechas que el POS no devuelve (historial).
+  const vivosPorFecha = new Map(pos.dias.map(d => [String(d.fecha || ''), d]))
+  const historicoSinDuplicados = historico.filter(d => !vivosPorFecha.has(String(d.fecha || '')))
+  const dias = [...pos.dias, ...historicoSinDuplicados]
     .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
     .slice(0, days)
-  const fuente: FuenteVentas = nuevos.length && historico.length ? 'fullsite+historico'
-    : nuevos.length ? 'fullsite' : historico.length ? 'historico' : 'ninguna'
+  const fuente: FuenteVentas = pos.dias.length && historicoSinDuplicados.length ? 'fullsite+historico'
+    : pos.dias.length ? 'fullsite' : historico.length ? 'historico' : 'ninguna'
   // Determinado = al menos una fuente se leyó bien. Si una falló, se dice en `motivo`.
   const determinado = pos.determinado || (!hist.fallo && historico.length > 0)
   const motivos = [pos.determinado ? '' : pos.motivo, hist.fallo || ''].filter(Boolean)
