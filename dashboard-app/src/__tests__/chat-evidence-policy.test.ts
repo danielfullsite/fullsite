@@ -40,9 +40,16 @@ describe('contrato de evidencia del copiloto', () => {
     expect(policy).toContain('cobertura de asistencia/turno')
   })
 
+  it('investiga las partes cubiertas de una pregunta compuesta antes de declarar una laguna', () => {
+    expect(policy).toContain('Resuelve automáticamente cada parte que sí tenga cobertura')
+    expect(policy).toContain('usa la fuente autorizada más detallada disponible')
+    expect(policy).toContain('Nunca abras con "No puedo responder"')
+  })
+
   it('se incorpora al chat que usan texto y voz, no queda como documentación suelta', () => {
     const ruta = readFileSync(join(process.cwd(), 'src/app/api/chat/route.ts'), 'utf8')
     expect(ruta).toContain("import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'")
     expect(ruta).toContain('${marcoEvidenciaOperativa()}')
+    expect(ruta).toContain('PREGUNTAS COMPUESTAS')
   })
 })
