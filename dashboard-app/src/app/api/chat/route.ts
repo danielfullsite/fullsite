@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { leerConfigDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas } from '@/lib/dayparts'
+import { leerConfigDayparts, preguntaDeFranjas, ventasPorFranja, contextoFranjas, extraerRangoHorario } from '@/lib/dayparts'
 import { crearRpc, intencion, leerFrescura, textoFrescura, contextoProducto, contextoReceta, contextoInsumo, esReferenciaCatalogoNatural } from '@/lib/chat-nativo'
 import { buildDailyFromOrders, buildDailyConEstado } from '@/lib/pos-daily'
 import { createServerClient } from '@supabase/ssr'
@@ -793,16 +793,20 @@ export async function POST(request: NextRequest) {
     try {
       const { config: franjasCfg, esDefault: franjasDefault, inicioDia } = cfgDayparts
       if (preguntaDeFranjas(q, franjasCfg)) {
+        const rangoSolicitado = extraerRangoHorario(message)
+        // Una ventana literal (ej. 7pm–10pm) se calcula tal cual; no se cambia por la
+        // franja "Cena" configurada ni se pide reconfigurar horarios para responderla.
+        const configConsulta = rangoSolicitado ? { franjas: [rangoSolicitado.franja] } : franjasCfg
         const qn = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         const diasAtras = qn.includes('hoy') ? 0 : qn.includes('ayer') ? 1 : /semana/.test(qn) ? 6 : wantsYear ? 364 : 29
         const hasta = qn.includes('ayer') ? restarDias(todayStr, 1) : todayStr
         const desde = restarDias(todayStr, diasAtras)
-        const filas = await ventasPorFranja({ sbUrl, sbKey, clientId: client_id || '', desde, hasta, config: franjasCfg, tz: zona, inicioDia })
+        const filas = await ventasPorFranja({ sbUrl, sbKey, clientId: client_id || '', desde, hasta, config: configConsulta, tz: zona, inicioDia })
         if (filas) {
-          franjasGrafica = { filas, config: franjasCfg, desde, hasta }
+          franjasGrafica = { filas, config: configConsulta, desde, hasta }
           const nombres = new Map<string, string>()
           for (const l of (sucursalesRaw || []) as { id?: string; name?: string }[]) if (l.id && l.name) nombres.set(l.id, datoTexto(l.name, 60))
-          franjasContext = contextoFranjas({ filas, config: franjasCfg, esDefault: franjasDefault, desde, hasta, nombreSucursal: id => nombres.get(id) || id })
+          franjasContext = contextoFranjas({ filas, config: configConsulta, esDefault: rangoSolicitado ? false : franjasDefault, desde, hasta, nombreSucursal: id => nombres.get(id) || id })
         }
       }
     } catch { /* franjas opcionales: sin ellas el chat sigue funcionando */ }

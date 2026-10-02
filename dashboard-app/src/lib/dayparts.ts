@@ -26,6 +26,10 @@ export interface DaypartsConfig {
   franjas: Franja[]
 }
 
+export interface RangoHorarioSolicitado {
+  franja: Franja
+}
+
 /** Si el restaurante no ha configurado nada. Se le dice a la IA que es genérico. */
 export const DAYPARTS_DEFAULT: DaypartsConfig = {
   franjas: [
@@ -138,6 +142,53 @@ export function describirFranja(f: Franja): string {
     return `${h12}:${String(mm).padStart(2, '0')}${ap}`
   }
   return `${h(f.inicio)}–${f.fin ? h(f.fin) : 'cierre'}`
+}
+
+function horaConMeridiano(hora: string, meridiano: string | undefined): number | null {
+  if (!meridiano) return null
+  const h = Number(hora)
+  if (!Number.isInteger(h) || h < 1 || h > 12) return null
+  const pm = /^p/.test(meridiano.replace(/\./g, '').toLowerCase())
+  return (h % 12) + (pm ? 12 : 0)
+}
+
+function menosUnMinuto(hhmm: string): string {
+  const total = (aMinutos(hhmm) + 1439) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+function describirHora(s: string): string {
+  const [hh, mm] = s.split(':').map(Number)
+  const ap = hh < 12 ? 'a.m.' : 'p.m.'
+  const h12 = hh % 12 === 0 ? 12 : hh % 12
+  return `${h12}:${String(mm).padStart(2, '0')} ${ap}`
+}
+
+/**
+ * Extrae sólo rangos inequívocos con AM/PM: "7pm a 10pm". La franja interna termina
+ * un minuto antes porque `fin` es inclusivo; así 7–10 significa [19:00, 22:00), sin
+ * colarse al bloque de las 10 p.m. Nunca adivina si falta el meridiano.
+ */
+export function extraerRangoHorario(pregunta: string): RangoHorarioSolicitado | null {
+  const re = /(?:de\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|am|pm)\s*(?:a|al|hasta|[-–—])\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|am|pm)/i
+  const m = pregunta.match(re)
+  if (!m) return null
+  const iniHora = horaConMeridiano(m[1], m[3])
+  const finHora = horaConMeridiano(m[4], m[6])
+  const iniMin = Number(m[2] || 0)
+  const finMin = Number(m[5] || 0)
+  if (iniHora === null || finHora === null || iniMin > 59 || finMin > 59) return null
+  const inicio = `${String(iniHora).padStart(2, '0')}:${String(iniMin).padStart(2, '0')}`
+  const finExclusivo = `${String(finHora).padStart(2, '0')}:${String(finMin).padStart(2, '0')}`
+  if (inicio === finExclusivo) return null
+  return {
+    franja: {
+      key: 'ventana-solicitada',
+      nombre: `${describirHora(inicio)}–${describirHora(finExclusivo)}`,
+      inicio,
+      fin: menosUnMinuto(finExclusivo),
+    },
+  }
 }
 
 /**
@@ -290,5 +341,5 @@ export function preguntaDeFranjas(q: string, config?: DaypartsConfig): boolean {
   const n = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const base = ['brunch', 'lunch', 'dinner', 'desayuno', 'comida', 'cena', 'merienda', 'horario', 'franja', 'turno', 'manana', 'tarde', 'noche', 'hora pico', 'a que hora', 'daypart']
   const propias = (config?.franjas ?? []).map(f => f.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase())
-  return [...base, ...propias].some(k => n.includes(k))
+  return Boolean(extraerRangoHorario(q)) || [...base, ...propias].some(k => n.includes(k))
 }

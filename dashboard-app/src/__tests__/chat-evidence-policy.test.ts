@@ -28,6 +28,12 @@ describe('contrato de evidencia del copiloto', () => {
     expect(policy).toContain('operación viva más reciente')
   })
 
+  it('trata campañas como hipótesis y conserva ventanas horarias literales', () => {
+    expect(policy).toContain('hipótesis causales')
+    expect(policy).toContain('7pm a 10pm')
+    expect(policy).toContain('no lo sustituyas por una franja genérica')
+  })
+
   it('se incorpora al chat que usan texto y voz, no queda como documentación suelta', () => {
     const ruta = readFileSync(join(process.cwd(), 'src/app/api/chat/route.ts'), 'utf8')
     expect(ruta).toContain("import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'")
