@@ -107,8 +107,10 @@ describe('El chat le dice a la IA que NO tiene el dato', () => {
   const chat = readFileSync(join(process.cwd(), 'src/app/api/chat/route.ts'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-  it('usa la version con estado', () => {
-    expect(chat).toContain('buildDailyConEstado(')
+  it('usa un lector que conserva el estado de fallo', () => {
+    // El chat ahora usa ventasFullsitePrimero, que internamente conserva el estado
+    // de buildDailyConEstado al combinar SQL vivo e historial.
+    expect(chat).toContain('ventasFullsitePrimero(sbUrl')
     expect(chat).toContain('ventasDeterminadas')
   })
 
