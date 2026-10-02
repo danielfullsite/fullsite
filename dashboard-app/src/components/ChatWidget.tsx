@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
-import { MessageCircle, X, ArrowLeft, Sparkles } from 'lucide-react'
+import { MessageCircle, X, ArrowLeft, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ChatMessage } from '@/lib/types'
 import { getActiveClientSlug } from '@/lib/data'
 import { hrefInternoSeguro } from '@/lib/chat-context'
-import { consultarChat, MENSAJE_ERROR_CHAT } from '@/lib/chat-cliente'
+import { consultarChat, consultarChatConMeta, MENSAJE_ERROR_CHAT } from '@/lib/chat-cliente'
 import { MODO_VOZ } from '@/lib/voz/instruccion-voz'
 import ComposerChat from '@/components/chat/ComposerChat'
 import ModoVozPanel from '@/components/chat/ModoVozPanel'
@@ -71,7 +71,7 @@ const ContenidoAsistente = memo(function ContenidoAsistente({ texto }: { texto: 
   )
 })
 
-type MensajeChat = ChatMessage & { timestamp?: Date; id?: number }
+type MensajeChat = ChatMessage & { timestamp?: Date; id?: number; chatLogId?: string; feedback?: 'useful' | 'not_useful' }
 let siguienteIdMensaje = 1
 
 export default function ChatWidget() {
@@ -167,17 +167,18 @@ export default function ChatWidget() {
     setIsLoading(true)
 
     try {
-      const fullText = await consultarChat({
+      const resultado = await consultarChatConMeta({
         message: text,
         history: messages.slice(-6),
         clientId: clientId || getActiveClientSlug(),
       })
+      const fullText = resultado.texto
 
       // Add placeholder message immediately (empty), then animate
       const idRespuesta = siguienteIdMensaje++
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: '', timestamp: new Date(), id: idRespuesta },
+        { role: 'assistant', content: '', timestamp: new Date(), id: idRespuesta, chatLogId: resultado.chatLogId },
       ])
 
       // Kick off typewriter
@@ -221,6 +222,16 @@ export default function ChatWidget() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  async function calificar(logId: string, verdict: 'useful' | 'not_useful') {
+    setMessages(prev => prev.map(m => m.chatLogId === logId ? { ...m, feedback: verdict } : m))
+    try {
+      await fetch('/api/chat/feedback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_log_id: logId, verdict, client_id: clientId || getActiveClientSlug() }),
+      })
+    } catch { /* la respuesta sigue disponible aunque el feedback no se pueda guardar */ }
   }
 
   if (!isOpen) {
@@ -336,6 +347,13 @@ export default function ChatWidget() {
                     ? <div className="whitespace-pre-wrap">{renderMarkdown(displayContent)}</div>
                     : <ContenidoAsistente texto={displayContent} />}
                 </div>
+                {msg.role === 'assistant' && msg.chatLogId && !isAnimating && (
+                  <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-3)]">
+                    <span className="mr-1">¿Te sirvió?</span>
+                    <button onClick={() => void calificar(msg.chatLogId!, 'useful')} aria-label="Respuesta útil" className={`rounded p-1 ${msg.feedback === 'useful' ? 'text-emerald-500' : 'hover:text-emerald-500'}`}><ThumbsUp size={13} /></button>
+                    <button onClick={() => void calificar(msg.chatLogId!, 'not_useful')} aria-label="Respuesta no útil" className={`rounded p-1 ${msg.feedback === 'not_useful' ? 'text-red-500' : 'hover:text-red-500'}`}><ThumbsDown size={13} /></button>
+                  </div>
+                )}
               </div>
             </div>
           )

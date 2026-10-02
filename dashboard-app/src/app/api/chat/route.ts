@@ -1486,12 +1486,16 @@ ${envolverDatos(bloqueDatos)}`
       } catch { /* non-blocking */ }
     }
 
+    // Cada respuesta tiene un id desde antes de persistir: permite recibir feedback
+    // humano sin volver a buscar por texto, fecha o mensaje (que serían ambiguos).
+    const chatLogId = crypto.randomUUID()
     // Log conversation to chat_logs (non-blocking)
     const hadError = finalText.toLowerCase().includes('no tengo') || finalText.toLowerCase().includes('no puedo') || finalText.toLowerCase().includes('no cuento')
     fetch(`${sbUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
+        id: chatLogId,
         client_id: client_id || '',
         user_id: userId || null,
         user_message: message.slice(0, 2000),
@@ -1502,7 +1506,7 @@ ${envolverDatos(bloqueDatos)}`
       }),
     }).catch(() => {})
 
-    return Response.json({ response: finalText })
+    return Response.json({ response: finalText, chat_log_id: chatLogId })
   } catch (error) {
     console.error('Chat API error:', error)
     const msg = error instanceof Error && error.message.includes('GROQ_API_KEY')
