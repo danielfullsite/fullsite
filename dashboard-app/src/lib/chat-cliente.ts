@@ -18,13 +18,15 @@ export class ErrorChat extends Error {
 
 export const MENSAJE_ERROR_CHAT = 'Hubo un error al procesar tu mensaje. Intenta de nuevo.'
 
-export async function consultarChat(opciones: {
+export type RespuestaChat = { texto: string; chatLogId?: string }
+
+export async function consultarChatConMeta(opciones: {
   message: string
   history: MensajeHistorial[]
   clientId: string | null | undefined
   modo?: ModoChat
   signal?: AbortSignal
-}): Promise<string> {
+}): Promise<RespuestaChat> {
   const { message, history, clientId, modo, signal } = opciones
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -37,7 +39,7 @@ export async function consultarChat(opciones: {
     }),
     signal,
   })
-  const data = await res.json().catch(() => ({})) as { response?: unknown; error?: unknown }
+  const data = await res.json().catch(() => ({})) as { response?: unknown; error?: unknown; chat_log_id?: unknown }
   if (!res.ok) {
     // El 429 del chat trae su mensaje en `response`; otros errores en `error`.
     const msg = typeof data.response === 'string' && data.response ? data.response
@@ -45,5 +47,19 @@ export async function consultarChat(opciones: {
         : MENSAJE_ERROR_CHAT
     throw new ErrorChat(msg, res.status)
   }
-  return typeof data.response === 'string' ? data.response : ''
+  return {
+    texto: typeof data.response === 'string' ? data.response : '',
+    chatLogId: typeof data.chat_log_id === 'string' ? data.chat_log_id : undefined,
+  }
+}
+
+/** Compatibilidad para voz y superficies que sólo necesitan el texto. */
+export async function consultarChat(opciones: {
+  message: string
+  history: MensajeHistorial[]
+  clientId: string | null | undefined
+  modo?: ModoChat
+  signal?: AbortSignal
+}): Promise<string> {
+  return (await consultarChatConMeta(opciones)).texto
 }
