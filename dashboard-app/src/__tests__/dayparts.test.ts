@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  validarDayparts, leerDayparts, franjaDe, aMinutos, contextoFranjas, preguntaDeFranjas,
+  validarDayparts, leerDayparts, franjaDe, aMinutos, contextoFranjas, preguntaDeFranjas, extraerRangoHorario,
   DAYPARTS_DEFAULT, type FilaFranja,
 } from '@/lib/dayparts'
 
@@ -137,5 +137,17 @@ describe('preguntaDeFranjas', () => {
     expect(preguntaDeFranjas('¿Qué % de mi venta de comida es de brunch, lunch y dinner?')).toBe(true)
     expect(preguntaDeFranjas('como va la hora feliz', { franjas: [{ key: 'hf', nombre: 'Hora Feliz', inicio: '18:00', fin: '20:00' }] })).toBe(true)
     expect(preguntaDeFranjas('quién es el mejor mesero')).toBe(false)
+    expect(preguntaDeFranjas('¿cómo nos fue de 7pm a 10pm?')).toBe(true)
+  })
+})
+
+describe('extraerRangoHorario', () => {
+  it('preserva una ventana literal de 7pm a 10pm sin incluir la hora de las 10', () => {
+    expect(extraerRangoHorario('lo mismo, pero de 7pm a 10pm')).toEqual({
+      franja: { key: 'ventana-solicitada', nombre: '7:00 p.m.–10:00 p.m.', inicio: '19:00', fin: '21:59' },
+    })
+  })
+  it('no adivina una franja si el meridiano es ambiguo', () => {
+    expect(extraerRangoHorario('de 7 a 10')).toBeNull()
   })
 })
