@@ -54,12 +54,37 @@ export function terminosBusqueda(mensaje: string): string[] {
   return norm(mensaje).split(/[^a-z0-9ñ]+/).filter(t => t.length >= 3 && !STOP.has(t))
 }
 
+/**
+ * "las chips", "el jitomate" o "las papitas" son referencias válidas a catálogo aunque
+ * no lleven una palabra técnica como "inventario". El resultado se confirma contra el
+ * catálogo del tenant; este detector nunca inventa un artículo ni sale a otro tenant.
+ */
+export function esReferenciaCatalogoNatural(mensaje: string): boolean {
+  const n = norm(mensaje).trim().replace(/^[¿?¡!\s]+/, '')
+  const terms = terminosBusqueda(mensaje)
+  return terms.length > 0 && (
+    /^(?:las?|los?)\s+[a-z0-9ñ]{3,}/.test(n)
+    || /\b(?:marca|fabricante|presentacion|presentación|proveedor|existencia|stock|reorden)\b/.test(n)
+  )
+}
+
+/** Variantes conservadoras para plural/singular: chips → chip; papitas → papita. */
+export function variantesBusqueda(terms: string[]): string[] {
+  const variants = new Set<string>()
+  for (const term of terms) {
+    variants.add(term)
+    if (term.endsWith('es') && term.length > 4) variants.add(term.slice(0, -2))
+    else if (term.endsWith('s') && term.length > 3) variants.add(term.slice(0, -1))
+  }
+  return [...variants]
+}
+
 export const intencion = (q: string) => {
   const n = norm(q)
   return {
     producto: /(vend|cuant|pieza|unidad|market|precio|historial de precio|subi[oó] el precio)/.test(n),
     receta: /(receta|lleva|gramo|ingrediente|cuanto cuesta hacer|costo de hacer|porcion|ficha tecnica)/.test(n),
-    insumo: /(proveedor|surte|insumo|por kilo|el kilo|costo del|costo de la|precio del kilo|quien vende|quien nos vende|a quien le compr)/.test(n),
+    insumo: /(proveedor|surte|insumo|por kilo|el kilo|costo del|costo de la|precio del kilo|quien vende|quien nos vende|a quien le compr|marca|fabricante|presentacion|presentación)/.test(n),
   }
 }
 
@@ -70,7 +95,13 @@ export const intencion = (q: string) => {
 async function buscar(rpc: Rpc, fn: string, base: Record<string, unknown>, terms: string[]) {
   const filas = await rpc(fn, { ...base, p_busqueda: terms.join(' ') })
   if (filas && filas.length === 0 && terms.length > 1) {
-    for (const t of [...terms].sort((a, b) => b.length - a.length).slice(0, 3)) {
+    for (const t of variantesBusqueda([...terms].sort((a, b) => b.length - a.length)).slice(0, 5)) {
+      const r = await rpc(fn, { ...base, p_busqueda: t })
+      if (r && r.length > 0) return r
+    }
+  }
+  if (filas && filas.length === 0 && terms.length === 1) {
+    for (const t of variantesBusqueda(terms).slice(1)) {
       const r = await rpc(fn, { ...base, p_busqueda: t })
       if (r && r.length > 0) return r
     }
@@ -214,10 +245,13 @@ export async function contextoInsumo(rpc: Rpc, clientId: string, mensaje: string
   if (terms.length === 0) return ''
   const filas = await buscar(rpc, 'fs_insumo', { p_client_id: clientId }, terms)
   if (!filas || filas.length === 0) return ''
+  const ambigua = filas.length > 1
+    ? `\nCoincidieron ${filas.length} insumos. Si no se especificó marca, presentación o proveedor, pide cuál antes de atribuir un costo, stock o proveedor a uno en particular.\n`
+    : ''
   const lineas = filas.slice(0, 12).map(f => {
     const contacto = [f.proveedor_contacto, f.proveedor_telefono].filter(Boolean).map(c => datoTexto(c, 60)).join(', ')
     const usado = Array.isArray(f.usado_en) && f.usado_en.length ? ` | se usa en: ${(f.usado_en as string[]).slice(0, 8).map(u => datoTexto(u)).join(', ')}` : ''
     return `  ${datoTexto(f.insumo)}: ${precio(f.costo_unitario)} por ${datoTexto(f.unidad, 12)}${f.proveedor ? `, proveedor ${datoTexto(f.proveedor, 60)}` : ', sin proveedor registrado'}${contacto ? ` (${contacto})` : ''}${f.dias_entrega ? `, entrega en ${f.dias_entrega} día(s)` : ''}${usado}`
   })
-  return `\nINSUMOS Y PROVEEDORES (catálogo de Fullsite):\n${lineas.join('\n')}\n`
+  return `\nINSUMOS Y PROVEEDORES (catálogo de Fullsite):${ambigua}${lineas.join('\n')}\n`
 }
