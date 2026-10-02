@@ -30,6 +30,7 @@ import {
 import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificador-numeros'
 import { marcoRazonamientoOperativo } from '@/lib/chat-operating-intent'
 import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'
+import { marcoAprendizajeMaestro, type LeccionMaestraRegistrada } from '@/lib/chat-master-learning'
 
 // Ciclo de consultas (hasta ~20 s) + lecturas: más que el default de algunas cuentas.
 export const maxDuration = 60
@@ -209,6 +210,17 @@ export async function POST(request: NextRequest) {
     // Service key (server-side only): sobrevive el endurecimiento RLS anon→authenticated
     const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const sbHeaders = { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+
+    // Patrones globales sin datos de clientes. Sólo recuperamos claves y versión: la
+    // explicación inyectada al modelo está versionada en código, no en la base.
+    const lessonsResponse = await fetch(
+      `${sbUrl}/rest/v1/chat_master_lessons?select=policy_key,status,policy_version&status=eq.active`,
+      { headers: sbHeaders, signal: AbortSignal.timeout(750) },
+    ).catch(() => null)
+    const masterLessons: LeccionMaestraRegistrada[] = lessonsResponse?.ok
+      ? await lessonsResponse.json().catch(() => [])
+      : []
+    const marcoMaestro = marcoAprendizajeMaestro(Array.isArray(masterLessons) ? masterLessons : [])
 
     // ── DÍA DE VENTA DEL TENANT (antes de las lecturas: varias se filtran por fecha) ──
     //
@@ -1172,6 +1184,7 @@ PERSONALIDAD:
 - Si el usuario pregunta por un producto que no está en los datos, di "No encontré [producto] en los registros. ¿Quieres que busque con otro nombre?"
 ${marcoRazonamientoOperativo(message)}
 ${marcoEvidenciaOperativa()}
+${marcoMaestro}
 
 REGLA #0 — SOLO RESTAURANTE:
 Eres el copiloto de ${datoTexto(restaurantName, 80)}. SOLO contestas preguntas sobre el restaurante: ventas, meseros, platillos, inventario, costos, reservaciones, operaciones.
