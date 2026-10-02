@@ -34,6 +34,12 @@ describe('contrato de evidencia del copiloto', () => {
     expect(policy).toContain('no lo sustituyas por una franja genérica')
   })
 
+  it('mantiene separadas las métricas y no inventa evidencia de inventario o turnos', () => {
+    expect(policy).toContain('personas, tickets, órdenes, pagos y mesas son distintos')
+    expect(policy).toContain('Inventario requiere evidencia propia y vigente')
+    expect(policy).toContain('cobertura de asistencia/turno')
+  })
+
   it('se incorpora al chat que usan texto y voz, no queda como documentación suelta', () => {
     const ruta = readFileSync(join(process.cwd(), 'src/app/api/chat/route.ts'), 'utf8')
     expect(ruta).toContain("import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'")
