@@ -276,6 +276,45 @@ export function pistasDelMapa(tablas: TablaMapa[]): string {
   return pistas.map(p => `- ${p}`).join('\n')
 }
 
+type DominioSemantico = {
+  etiqueta: string
+  pregunta: RegExp
+  fuente: string[]
+  limite: string
+}
+
+/**
+ * Traduce el mapa técnico a fuentes operativas. Así una venta no se usa como
+ * evidencia de campaña, recurrencia, inventario o margen neto sin su fuente propia.
+ * Sólo enumera tablas que ya pertenecen al tenant y no amplía permisos.
+ */
+const DOMINIOS_SEMANTICOS: DominioSemantico[] = [
+  { etiqueta: 'franja horaria', pregunta: /\b(hora|horario|franja|lunch|dinner|brunch|desayuno|comida|cena|merienda|\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?|am|pm))\b/i, fuente: ['created_at', 'opened_at', 'closed_at', 'hora', 'abierto', 'cerrado', 'fecha_hora'], limite: 'una fecha sin hora no permite comparar lunch, dinner ni una ventana literal' },
+  { etiqueta: 'clientes y recurrencia', pregunta: /\b(clientes?|customers?|nuevos?|recurrentes?|retenci[oó]n|cohorte|visitas?)\b/i, fuente: ['cliente', 'customer', 'telefono', 'email', 'phone', 'guest', 'contacto'], limite: 'ventas agregadas no prueban clientes nuevos, recurrencia ni cohortes' },
+  { etiqueta: 'campaña y atribución', pregunta: /\b(publicidad|campa[nñ]a|utm|canal|referid|instagram|facebook|google|anuncio)\b/i, fuente: ['campan', 'campaign', 'utm', 'source', 'origen', 'referid', 'canal', 'ad_'], limite: 'una mejora posterior no prueba que una campaña la causó' },
+  { etiqueta: 'inventario físico', pregunta: /\b(inventario|stock|existencia|desabasto|reorden|merma|insumo)\b/i, fuente: ['invent', 'stock', 'existencia', 'on_hand', 'reorden', 'merma', 'waste'], limite: 'recetas, costos y ventas no prueban existencia física ni disponibilidad vigente' },
+  { etiqueta: 'costo y margen', pregunta: /\b(margen|costo|food\s*cost|comisi[oó]n|n[oó]mina|rentabilidad)\b/i, fuente: ['costo', 'cost', 'margen', 'margin', 'comision', 'payroll', 'nomina', 'gasto', 'expense'], limite: 'un precio de venta solo no demuestra margen neto' },
+  { etiqueta: 'personal y turnos', pregunta: /\b(mesero|personal|staff|turno|asistencia|desempe[nñ]o|equipo)\b/i, fuente: ['staff', 'mesero', 'empleado', 'attendance', 'asistencia', 'shift', 'turno', 'usuario'], limite: 'ventas por persona sin asistencia y franja comparable no prueban desempeño ni causalidad' },
+  { etiqueta: 'pagos y corte', pregunta: /\b(pago|tarjeta|efectivo|propina|corte|arqueo|conciliaci[oó]n)\b/i, fuente: ['payment', 'pago', 'tarjeta', 'efectivo', 'propina', 'corte', 'cash'], limite: 'ventas no sustituyen una conciliación de pagos, propinas y corte' },
+]
+
+function coincideFuente(tabla: TablaMapa, fragmentos: string[]): boolean {
+  const superficie = `${tabla.tabla} ${tabla.columnas.map(c => c.c).join(' ')}`.toLowerCase()
+  return fragmentos.some(fragmento => superficie.includes(fragmento))
+}
+
+/** Capacidades y límites para los dominios que pide la persona en ESTA pregunta. */
+export function coberturaSemantica(tablas: TablaMapa[], pregunta: string): string {
+  const dominios = DOMINIOS_SEMANTICOS.filter(d => d.pregunta.test(pregunta))
+  if (dominios.length === 0) return ''
+  const lineas = dominios.map(dominio => {
+    const fuentes = tablas.filter(tabla => coincideFuente(tabla, dominio.fuente)).slice(0, 5)
+    if (fuentes.length === 0) return `- ${dominio.etiqueta}: no hay fuente directa identificada en el mapa actual. ${dominio.limite}. No la inventes; resuelve las demás partes.`
+    return `- ${dominio.etiqueta}: consulta primero ${fuentes.map(tabla => datoTexto(tabla.tabla, 63)).join(', ')}. ${dominio.limite}.`
+  })
+  return `\nCOBERTURA SEMÁNTICA DE ESTA PREGUNTA (guía de investigación; no es evidencia por sí sola):\n${lineas.join('\n')}\n`
+}
+
 // ── Consulta ────────────────────────────────────────────────────────────────
 
 /**

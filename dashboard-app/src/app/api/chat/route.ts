@@ -24,7 +24,7 @@ import {
 import type { FilaFranja, DaypartsConfig } from '@/lib/dayparts'
 import type { GraficaSpec } from '@/lib/grafica-spec'
 import {
-  bloqueMapa, credencialesLectura, datosHastaDeTablas, ejecutarConsulta, leerMapa, pistasDelMapa, responderConHerramientas,
+  bloqueMapa, coberturaSemantica, credencialesLectura, datosHastaDeTablas, ejecutarConsulta, leerMapa, pistasDelMapa, responderConHerramientas,
   mensajesDeRespaldo, MAX_CONSULTAS, type ConsultaHecha, type ResultadoCiclo,
 } from '@/lib/ia-lectura'
 import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificador-numeros'
@@ -1126,6 +1126,7 @@ export async function POST(request: NextRequest) {
     // ── LECTURA UNIVERSAL: mapa de tablas + herramienta consultar_datos ─────────
     // El mapa va DENTRO del bloque de datos (nombres y comentarios son texto de la base).
     const mapaCtx = bloqueMapa(mapa, message)
+    const coberturaSemanticaCtx = coberturaSemantica(mapa.ok ? mapa.tablas : [], message)
     const siNoEsta = hayConsultaLibre
       ? 'si la cifra NO está en el contexto, CONSÚLTALA con consultar_datos; si tampoco se puede, di "no lo tengo" y da lo más cercano que SÍ esté, con su fecha.'
       : 'si la cifra que te piden NO está en el contexto, di "no lo tengo calculado" y da lo más cercano que SÍ esté, con su fecha.'
@@ -1138,8 +1139,9 @@ Además de los bloques precalculados tienes el MAPA DE DATOS (dentro del bloque 
 4. SQL de Postgres de sólo lectura (una sentencia SELECT/WITH) con los nombres EXACTOS de tablas y columnas del mapa, sin esquema y sin filtrar por client_id (ya viene filtrado). Funciones permitidas: agregados, fecha/hora (date_trunc, extract, to_char, now), texto, jsonb (jsonb_array_elements, ->, ->>), ventanas y es_venta(status, payment_status).
 5. Sumas, promedios, conteos y porcentajes se hacen EN SQL; nunca los calcules tú.
 6. Si la consulta regresa error, corrígela con el mensaje; si no puedes, di que no pudiste consultarlo, pero entrega el resto de la respuesta que sí esté respaldado.
-6. Nombra las columnas por su unidad: dinero con total/venta/importe/ticket/precio (p. ej. "as venta_total"), porcentajes con pct (p. ej. "as pct_bebidas", ya multiplicado por 100). Así se verifican tus cifras.
+7. Nombra las columnas por su unidad: dinero con total/venta/importe/ticket/precio (p. ej. "as venta_total"), porcentajes con pct (p. ej. "as pct_bebidas", ya multiplicado por 100). Así se verifican tus cifras.
 ${pistasDelMapa(mapa.ok ? mapa.tablas : [])}
+${coberturaSemanticaCtx}
 
 HONESTIDAD CON CONSULTAS:
 - Todo número de tu respuesta sale de un bloque precalculado o del resultado de una consulta. Cero cuentas mentales.
