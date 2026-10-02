@@ -31,6 +31,7 @@ import { Evidencia, garantizarNumeros, mensajeReparacion } from '@/lib/verificad
 import { marcoRazonamientoOperativo } from '@/lib/chat-operating-intent'
 import { marcoEvidenciaOperativa } from '@/lib/chat-evidence-policy'
 import { marcoAprendizajeMaestro, type LeccionMaestraRegistrada } from '@/lib/chat-master-learning'
+import { supervisarRespuestaChat } from '@/lib/chat-supervision'
 
 // Ciclo de consultas (hasta ~20 s) + lecturas: más que el default de algunas cuentas.
 export const maxDuration = 60
@@ -1506,9 +1507,22 @@ ${envolverDatos(bloqueDatos)}`
     // Cada respuesta tiene un id desde antes de persistir: permite recibir feedback
     // humano sin volver a buscar por texto, fecha o mensaje (que serían ambiguos).
     const chatLogId = crypto.randomUUID()
-    // Log conversation to chat_logs (non-blocking)
+    const supervision = supervisarRespuestaChat({
+      authorizationVerified: true, // requireTenant ya falló cerrado antes de llegar aquí.
+      numericClaims: garantia.afirmaciones,
+      untracedNumericClaims: garantia.sinRastroInicial,
+      numericClaimsMarked: garantia.marcados,
+      sourceReadFailed: !mapa.ok || (ciclo?.errores.length ?? 0) > 0,
+      toolQueryCount: ciclo?.consultas.length ?? 0,
+      toolQueryErrorCount: ciclo?.errores.length ?? 0,
+      responseRepaired: garantia.reparado,
+      responseAvailable: Boolean(finalText.trim()),
+    })
+
+    // No se entrega una respuesta como supervisada si no se puede registrar la conversación
+    // y su ficha de control. Esto evita huecos silenciosos en la cola de revisión.
     const hadError = finalText.toLowerCase().includes('no tengo') || finalText.toLowerCase().includes('no puedo') || finalText.toLowerCase().includes('no cuento')
-    fetch(`${sbUrl}/rest/v1/chat_logs`, {
+    const chatLogWrite = await fetch(`${sbUrl}/rest/v1/chat_logs`, {
       method: 'POST',
       headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
@@ -1521,7 +1535,23 @@ ${envolverDatos(bloqueDatos)}`
         had_error: hadError,
         error_type: hadError ? (finalText.includes('no tengo') ? 'no_data' : finalText.includes('no puedo') ? 'cant_do' : 'other') : null,
       }),
-    }).catch(() => {})
+    }).catch(() => null)
+    if (!chatLogWrite?.ok) {
+      return Response.json({ response: 'El copiloto no pudo registrar la supervisión de esta respuesta. Intenta de nuevo.' }, { status: 503 })
+    }
+
+    const auditWrite = await fetch(`${sbUrl}/rest/v1/chat_supervision_audits`, {
+      method: 'POST',
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        client_id: client_id || '',
+        chat_log_id: chatLogId,
+        ...supervision,
+      }),
+    }).catch(() => null)
+    if (!auditWrite?.ok) {
+      return Response.json({ response: 'El copiloto no pudo registrar la supervisión de esta respuesta. Intenta de nuevo.' }, { status: 503 })
+    }
 
     return Response.json({ response: finalText, chat_log_id: chatLogId })
   } catch (error) {
