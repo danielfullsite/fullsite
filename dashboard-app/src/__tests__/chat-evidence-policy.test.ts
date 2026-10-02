@@ -11,6 +11,11 @@ describe('contrato de evidencia del copiloto', () => {
     expect(policy).toContain('Nunca rechaces una pregunta amplia')
   })
 
+  it('resuelve referencias de la conversación sin inventar un referente ambiguo', () => {
+    expect(policy).toContain('referencias conversacionales')
+    expect(policy).toContain('pide UNA aclaración corta')
+  })
+
   it('separa hechos, inferencias, datos faltantes y una acción', () => {
     for (const etiqueta of ['**Hecho:**', '**Lectura:**', '**Falta para confirmarlo:**', '**Siguiente paso:**']) {
       expect(policy).toContain(etiqueta)
