@@ -80,6 +80,8 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<MensajeChat[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [coachingFor, setCoachingFor] = useState<string | null>(null)
+  const [coachingNote, setCoachingNote] = useState('')
   // Modo voz "Habla con tu restaurante": panel encima del chat, mismo historial.
   const [modoVoz, setModoVoz] = useState(false)
   const messagesRef = useRef(messages)
@@ -224,12 +226,12 @@ export default function ChatWidget() {
     }
   }
 
-  async function calificar(logId: string, verdict: 'useful' | 'not_useful') {
+  async function calificar(logId: string, verdict: 'useful' | 'not_useful', note = '') {
     setMessages(prev => prev.map(m => m.chatLogId === logId ? { ...m, feedback: verdict } : m))
     try {
       await fetch('/api/chat/feedback', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_log_id: logId, verdict, client_id: clientId || getActiveClientSlug() }),
+        body: JSON.stringify({ chat_log_id: logId, verdict, note, client_id: clientId || getActiveClientSlug() }),
       })
     } catch { /* la respuesta sigue disponible aunque el feedback no se pueda guardar */ }
   }
@@ -351,8 +353,32 @@ export default function ChatWidget() {
                   <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-3)]">
                     <span className="mr-1">¿Te sirvió?</span>
                     <button onClick={() => void calificar(msg.chatLogId!, 'useful')} aria-label="Respuesta útil" className={`rounded p-1 ${msg.feedback === 'useful' ? 'text-emerald-500' : 'hover:text-emerald-500'}`}><ThumbsUp size={13} /></button>
-                    <button onClick={() => void calificar(msg.chatLogId!, 'not_useful')} aria-label="Respuesta no útil" className={`rounded p-1 ${msg.feedback === 'not_useful' ? 'text-red-500' : 'hover:text-red-500'}`}><ThumbsDown size={13} /></button>
+                    <button onClick={() => { setCoachingFor(msg.chatLogId!); setCoachingNote('') }} aria-label="Respuesta no útil" className={`rounded p-1 ${msg.feedback === 'not_useful' ? 'text-red-500' : 'hover:text-red-500'}`}><ThumbsDown size={13} /></button>
                   </div>
+                )}
+                {msg.role === 'assistant' && msg.chatLogId && coachingFor === msg.chatLogId && !isAnimating && (
+                  <form
+                    className="mt-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void calificar(msg.chatLogId!, 'not_useful', coachingNote)
+                      setCoachingFor(null)
+                      setCoachingNote('')
+                    }}
+                  >
+                    <label className="block text-[11px] font-medium text-[var(--text-2)]">¿Qué faltó o qué sería correcto?</label>
+                    <textarea
+                      value={coachingNote}
+                      onChange={(e) => setCoachingNote(e.target.value.slice(0, 1200))}
+                      placeholder="Ej. compara contra la misma hora, no contra el cierre"
+                      className="mt-1 w-full resize-none rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1.5 text-xs text-[var(--text-1)] outline-none focus:border-emerald-500"
+                      rows={2}
+                    />
+                    <div className="mt-1 flex justify-end gap-2 text-xs">
+                      <button type="button" onClick={() => { setCoachingFor(null); setCoachingNote('') }} className="text-[var(--text-3)]">Cancelar</button>
+                      <button type="submit" className="font-medium text-emerald-600">Enviar al coach</button>
+                    </div>
+                  </form>
                 )}
               </div>
             </div>
